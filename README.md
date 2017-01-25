@@ -1,9 +1,21 @@
 # ActiveResource
-PHP ActiveResource implementation. Use a RESTful resource based API like a database.
+Framework agnostic PHP ActiveResource implementation.
+
+Use a RESTful resource based API like a database in an ActiveRecord pattern.
+
+## Author's note
+This project was started because I could not seem to find a good, maintained, and easy to use PHP based
+ActiveResource package. Even though it's still in its infancy, I have personally used it on two
+separate projects interacting with two completely different APIs: one built and maintained by me and
+the other a 3rd party.
+
+I hope you will find it as useful as I have.
+
+If you have any suggestions or potential feature requests, feel free to ping me.
 
 ## Installation
 
-    composer require nimbly/ActiveResource
+    composer require nimbly/activeresource
 
 
 ## Configuration
@@ -61,8 +73,13 @@ Example:
 Because each and every API responds with its own unique payload and encoding, you must
 provide a response class that extends `\ActiveResource\ResponseAbstract`.
 
-You must implement a `parse` method that returns an object or array representing the
-response body and an `isSuccessful` method that returns a boolean value.
+### Required method implementation
+`parse` Accepts the raw payload contents from the response. Should return an array or \StdClass
+object representing the data. See Expected Data Format for more details.
+
+`isSuccessful` Should return a boolean indicating whether the request was successful or not. Some APIs
+do not adhere to strict REST patterns and may return an HTTP Status Code of 200 for all requests. In this
+case there is usually a property in the payload indicating whether the request was successful or not.
  
 The Response object is also a great way to include any other methods to access non-payload
 related data or headers. It all depends on what data is in the response body for the API you
@@ -92,6 +109,65 @@ Example:
             return $this->pauload->envelope;
         }
     }
+    
+
+## Expected data format
+In order for ActiveResource to properly hydrate your Model instances, the parsed payload data must be
+ formatted in the following pattern:
+ 
+     {
+         property1: "value",
+         property2: "value",
+         property3: "value",
+         related_single_resource: {
+             property1: "value",
+             property2: "value",
+         },
+         related_multiple_resources: [
+             {
+                 property1: "value",
+                 property2: "value"
+             }
+         ]
+     }
+
+Example:
+
+    {
+        "id": "1234",
+        "title": "Blog post",
+        "body": "This is a blog post",
+        "author": {
+            "id": "32135",
+            "name": "John Doe",
+            "email": "jdoe@example.com",
+        },
+        "comments": [
+            {
+                "id": "18319",
+                "body": "This is a comment",
+                "author": {
+                    "id": "49913",
+                    "name": "Jane Doe",
+                    "email": "jane.doe@example.com"
+                }
+            },
+                
+            {
+                "id": "18320",
+                "body": "This is another comment",
+                "author": {
+                    "id": "823194",
+                    "name": "Thomas Quigley",
+                    "email": "tquigley@example.com"
+                }
+            }
+        ]
+    }    
+
+If the API you are working with does not have its data formatted in this manor - you will need to transform it so that it is.
+This can (and should) be done in your `Response` class `parse` method.
+
     
 ## Error
 Because each API responds differently for its errors, you must implement an Error class
@@ -236,6 +312,11 @@ Example:
     $user->status = 'INACTIVE';
     $user->save();
     
+### Quickly assign properties
+    $user = User::find($id);
+    $user->fill($requestData);
+    $user->save();
+    
 ### Delete a resource
     $user = User::find($id);
     $user->delete();
@@ -243,3 +324,39 @@ Example:
 Or
     
     User::remove($id);
+
+## FAQ
+##### How do I send an Authorization header with every request?
+If the Authorization scheme is either Basic or Bearer, the easiest way to add the header is on the
+Guzzle client instance when creating the Connection object.
+
+Example:
+        
+        $client = new Client([
+          'headers' => [
+              'Authorization' => 'Bearer MYAPITOKEN',
+        ]);
+        
+        $connection = new Connection($options, $client);
+        
+For Authorization schemas that are a bit more complex (eg HMAC), use a Middleware approach.
+
+##### The API response payload I am working with has all its data returned in the same path. Do I really need to have a parseFind and parseAll method on every model?
+No, you don't. Create a BaseModel class with the parseFind and parseAll methods. Then extend
+all your models from the BaseModel.
+
+##### The API I am working with responds in JSON-API, how do I deal with that?
+In your parse method on the Response object, you'll need to do a lot of work, but it can be done. ActiveResource
+is looking for the parsed payload data to be in a specific format. See Expected Data Format for more information.
+
+##### I need to access response headers on some of my API calls. How do I do that?
+You can access the Response object for the last API request via the Model's `getResponse` method. The Response object
+has methods for retrieving response headers.
+
+##### My API call is failing. How do I get access to the error response payload?
+You can access the Error object for the last API request via the model's `getError` method.
+
+##### I'd like to be able to automatically throw an exception on certain HTTP response codes. How do I do that?
+The Response object has a protected array property called `throwable`. By default, HTTP Status 500 will throw an
+`ActiveResourceResponseException`. You can override the array in your Response class with any set of HTTP status
+codes you want. Or make it an empty array to *never* throw an exception.
