@@ -13,9 +13,38 @@ use Psr\Http\Message\ResponseInterface;
 
 abstract class ResponseAbstract
 {
+    /**
+     * HTTP response code
+     *
+     * @var int
+     */
     protected $statusCode;
+
+    /**
+     * Status description
+     *
+     * @var string
+     */
+    protected $statusPhrase;
+
+    /**
+     * Array of response headers
+     *
+     * @var \string[][]
+     */
     protected $headers;
+
+    /**
+     * Array of HTTP response codes that ActiveResource should throw an exception when encountering
+     *
+     * @var array
+     */
     protected $throwable = [500];
+
+    /**
+     * The fully decoded payload
+     * @var mixed
+     */
     protected $payload;
 
     /**
@@ -25,6 +54,7 @@ abstract class ResponseAbstract
     public function __construct(ResponseInterface $response)
     {
         $this->statusCode = $response->getStatusCode();
+        $this->statusPhrase = $response->getReasonPhrase();
         $this->headers = $response->getHeaders();
         $this->payload = $this->parse($response->getBody()->getContents());
     }
@@ -32,11 +62,21 @@ abstract class ResponseAbstract
     /**
      * Get the response status code
      *
-     * @return mixed
+     * @return int
      */
     public function getStatusCode()
     {
         return $this->statusCode;
+    }
+
+    /**
+     * Get the response status code
+     *
+     * @return string
+     */
+    public function getStatusPhrase()
+    {
+        return $this->statusPhrase;
     }
 
     /**

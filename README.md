@@ -25,20 +25,27 @@ ActiveResource lets you connect to any number of RESTful APIs within your code.
 2. Use `ConnectionManager::add` to assign a name and add the `Connection` to its pool of connections.
 
 ### Connection
-Create a new `Connection` instance representing a connection to an API.
+Create a new `Connection` instance representing a connection to an API. The constructor takes two parameters:
 
 ##### Options
 The options array may contain:
 
-`defaultUri` The default URI to prepend to each request. For example: `http://some.api.com/v2/`
+`defaultUri` *string* The default URI to prepend to each request. For example: `http://some.api.com/v2/`
 
-`errorClass` Class name of the Error class to use for interacting with error responses from the API.
+`defaultQueryParms` *array* Key => value pairs to include in the query with every request.
 
-`responseClass` Class name of the Response class to use for parsing responses including headers and body.
+`errorClass` *string* Class name of the Error class to use for interacting with error responses from the API. See Error
+section for more info.
 
-`updateMethod` HTTP method to use for updates, defaults to `PUT`.
+`responseClass` *string* Class name of the Response class to use for parsing responses including headers and body. See
+Response section for more info.
 
-`middleware` An array of middleware classes to run before sending each request.
+`updateMethod` *string* HTTP method to use for updates, defaults to `put`.
+
+`updateDiff` *boolean* Whether ActiveResource can send just the modified fields of the resource on an update.
+
+`middleware` *array* An array of middleware classes to run before sending each request. See Middleware section for more
+info.
 
 ##### HttpClient
 An optional instance of `GuzzleHttp\Client`. If you do not provide an instance, one will be created automatically
@@ -48,7 +55,8 @@ Example:
 
     $options = [
         'baseUri' => 'http://api.someurl.com/v1/',
-        'updateMethod' => 'PATCH',
+        'updateMethod' => 'patch',
+        'updateDiff' => true,
         'responseClass' => \My\Custom\Response::class,
         'errorClass' => \My\Custom\Error::class,
         'middleware' => [

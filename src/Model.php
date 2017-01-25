@@ -158,14 +158,14 @@ abstract class Model
 
         if( $this->response->isThrowable() ) {
             $errorClass = $this->getConnection()->getErrorClass();
-            $error = new $errorClass($this->response->getPayload());
+            $error = new $errorClass($this->response);
 
             throw new ActiveResourceResponseException($this->response, $error);
         }
 
         // Set the error
         $errorClass = $connection->getErrorClass();
-        $this->error = new $errorClass($this->response->getPayload());
+        $this->error = new $errorClass($this->response);
 
         return false;
     }
@@ -191,7 +191,7 @@ abstract class Model
 
         if( $this->response->isThrowable() ) {
             $errorClass = $this->getConnection()->getErrorClass();
-            $error = new $errorClass($this->response->getPayload());
+            $error = new $errorClass($this->response);
 
             throw new ActiveResourceResponseException($this->response, $error);
         }
@@ -508,7 +508,7 @@ abstract class Model
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response->getPayload());
+            $error = new $errorClass($response);
 
             throw new ActiveResourceResponseException($response, $error);
         }
@@ -550,7 +550,7 @@ abstract class Model
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response->getPayload());
+            $error = new $errorClass($response);
 
             throw new ActiveResourceResponseException($response, $error);
         }
@@ -591,7 +591,7 @@ abstract class Model
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response->getPayload());
+            $error = new $errorClass($response);
 
             throw new ActiveResourceResponseException($response, $error);
         }
@@ -653,7 +653,7 @@ abstract class Model
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response->getPayload());
+            $error = new $errorClass($response);
 
             throw new ActiveResourceResponseException($response, $error);
         }
@@ -713,7 +713,7 @@ abstract class Model
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response->getPayload());
+            $error = new $errorClass($response);
 
             throw new ActiveResourceResponseException($response, $error);
         }

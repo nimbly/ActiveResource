@@ -11,11 +11,12 @@ namespace ActiveResource;
 
 abstract class ErrorAbstract
 {
-    protected $payload;
+    /** @var ResponseAbstract  */
+    protected $response;
 
-    public function __construct($payload)
+    public function __construct(ResponseAbstract $response)
     {
-        $this->payload = $payload;
+        $this->response = $response;
     }
 
     /**
