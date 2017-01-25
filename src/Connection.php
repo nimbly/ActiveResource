@@ -11,6 +11,7 @@ namespace ActiveResource;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\BadResponseException;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Psr7\Request;
 use Psr\Http\Message\ResponseInterface;
 
@@ -237,6 +238,9 @@ class Connection
 
     /**
      * @param Request $request
+     *
+     * @throws ConnectException
+     *
      * @return ResponseAbstract
      */
     protected function call(Request $request)
@@ -258,6 +262,9 @@ class Connection
      * @param $url
      * @param array $queryParams
      * @param array $headers
+     *
+     * @throws ConnectException
+     *
      * @return ResponseAbstract
      */
     public function get($url, array $queryParams = [], array $headers = [])
@@ -272,6 +279,9 @@ class Connection
      * @param array $queryParams
      * @param null $body
      * @param array $headers
+     *
+     * @throws ConnectException
+     *
      * @return ResponseAbstract
      */
     public function post($url, array $queryParams = [], $body = null, array $headers = [])
@@ -286,6 +296,9 @@ class Connection
      * @param array $queryParams
      * @param null $body
      * @param array $headers
+     *
+     * @throws ConnectException
+     *
      * @return ResponseAbstract
      */
     public function put($url, array $queryParams = [], $body = null, array $headers = [])
@@ -300,6 +313,9 @@ class Connection
      * @param array $queryParams
      * @param null $body
      * @param array $headers
+     *
+     * @throws ConnectException
+     *
      * @return ResponseAbstract
      */
     public function patch($url, array $queryParams = [], $body = null, array $headers = [])
@@ -313,6 +329,9 @@ class Connection
      * @param $url
      * @param array $queryParams
      * @param array $headers
+     *
+     * @throws ConnectException
+     *
      * @return ResponseAbstract
      */
     public function delete($url, array $queryParams = [], array $headers = [])
@@ -326,6 +345,9 @@ class Connection
      * @param $url
      * @param array $queryParams
      * @param array $headers
+     *
+     * @throws ConnectException
+     *
      * @return ResponseAbstract
      */
     public function head($url, array $queryParams = [], array $headers = [])

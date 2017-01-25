@@ -15,6 +15,7 @@ class ConnectionManager
 
     /**
      * Add a connection
+     *
      * @param $name
      * @param Connection $connection
      */
@@ -23,7 +24,8 @@ class ConnectionManager
     }
 
     /**
-     * Get a connection
+     * Get a connection by its name
+     *
      * @param $name
      * @throws ActiveResourceException
      * @return Connection

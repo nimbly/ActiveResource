@@ -156,16 +156,13 @@ abstract class Model
             return true;
         }
 
-        if( $this->response->isThrowable() ) {
-            $errorClass = $this->getConnection()->getErrorClass();
-            $error = new $errorClass($this->response);
-
-            throw new ActiveResourceResponseException($this->response, $error);
-        }
-
         // Set the error
         $errorClass = $connection->getErrorClass();
         $this->error = new $errorClass($this->response);
+
+        if( $this->response->isThrowable() ) {
+            throw new ActiveResourceResponseException($this->error);
+        }
 
         return false;
     }
@@ -189,16 +186,13 @@ abstract class Model
             return true;
         }
 
-        if( $this->response->isThrowable() ) {
-            $errorClass = $this->getConnection()->getErrorClass();
-            $error = new $errorClass($this->response);
-
-            throw new ActiveResourceResponseException($this->response, $error);
-        }
-
         // Set the error
         $errorClass = $connection->getErrorClass();
         $this->error = new $errorClass($this->response);
+
+        if( $this->response->isThrowable() ) {
+            throw new ActiveResourceResponseException($this->error);
+        }
 
         return false;
     }
@@ -422,8 +416,11 @@ abstract class Model
 
     /**
      * Hydrate
+     *
      * @param $data
+     *
      * @throws ActiveResourceException
+     *
      * @return boolean
      */
     protected function hydrate($data)
@@ -473,7 +470,7 @@ abstract class Model
      * @param array $queryParams
      * @param array $headers
      *
-     * @throws ActiveResourceException
+     * @throws ActiveResourceResponseException
      *
      * @return Model|boolean
      */
@@ -510,7 +507,7 @@ abstract class Model
             $errorClass = $instance->getConnection()->getErrorClass();
             $error = new $errorClass($response);
 
-            throw new ActiveResourceResponseException($response, $error);
+            throw new ActiveResourceResponseException($error);
         }
 
         return false;
@@ -524,6 +521,8 @@ abstract class Model
      *
      * @param array $queryParams
      * @param array $headers
+     *
+     * @throws ActiveResourceResponseException
      *
      * @return Collection|boolean
      */
@@ -552,7 +551,7 @@ abstract class Model
             $errorClass = $instance->getConnection()->getErrorClass();
             $error = new $errorClass($response);
 
-            throw new ActiveResourceResponseException($response, $error);
+            throw new ActiveResourceResponseException($error);
         }
 
         return false;
@@ -564,6 +563,8 @@ abstract class Model
      * @param $id
      * @param array $queryParams
      * @param array $headers
+     *
+     * @throws ActiveResourceResponseException
      *
      * @return bool
      */
@@ -593,7 +594,7 @@ abstract class Model
             $errorClass = $instance->getConnection()->getErrorClass();
             $error = new $errorClass($response);
 
-            throw new ActiveResourceResponseException($response, $error);
+            throw new ActiveResourceResponseException($error);
         }
 
         return false;
@@ -615,6 +616,8 @@ abstract class Model
      * @param $id
      * @param array $queryParams
      * @param array $headers
+     *
+     * @throws ActiveResourceResponseException
      *
      * @return Model|bool
      */
@@ -655,7 +658,7 @@ abstract class Model
             $errorClass = $instance->getConnection()->getErrorClass();
             $error = new $errorClass($response);
 
-            throw new ActiveResourceResponseException($response, $error);
+            throw new ActiveResourceResponseException($error);
         }
 
         return false;
@@ -677,6 +680,8 @@ abstract class Model
      * @param Model|string $resource
      * @param array $queryParams
      * @param array $headers
+     *
+     * @throws ActiveResourceResponseException
      *
      * @return Collection|bool
      */
@@ -715,7 +720,7 @@ abstract class Model
             $errorClass = $instance->getConnection()->getErrorClass();
             $error = new $errorClass($response);
 
-            throw new ActiveResourceResponseException($response, $error);
+            throw new ActiveResourceResponseException($error);
         }
 
         return false;
@@ -725,6 +730,9 @@ abstract class Model
      * Get the named Connection instance
      *
      * @param $connectionName
+     *
+     * @throws ActiveResourceException
+     *
      * @return Connection
      */
     public static function connection($connectionName){

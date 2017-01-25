@@ -11,20 +11,13 @@ namespace ActiveResource;
 
 class ActiveResourceResponseException extends \RuntimeException
 {
-    protected $response = null;
     protected $error = null;
 
-    public function __construct(ResponseAbstract $response, ErrorAbstract $error)
+    public function __construct(ErrorAbstract $error)
     {
-        parent::__construct($error->getMessage(), $response->getStatusCode(), null);
+        parent::__construct($error->getMessage(), $error->getResponse()->getStatusCode(), null);
 
-        $this->response = $response;
         $this->error = $error;
-    }
-
-    public function getResponse()
-    {
-        return $this->response;
     }
 
     public function getError()

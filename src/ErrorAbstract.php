@@ -19,6 +19,11 @@ abstract class ErrorAbstract
         $this->response = $response;
     }
 
+    public function getResponse()
+    {
+        return $this->response;
+    }
+
     /**
      * Get the error message returned by the API
      *
