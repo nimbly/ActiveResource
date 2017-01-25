@@ -51,7 +51,7 @@ info.
 An optional instance of `GuzzleHttp\Client`. If you do not provide an instance, one will be created automatically
 with no options set.
 
-Example:
+###### Example
 
     $options = [
         'baseUri' => 'http://api.someurl.com/v1/',
@@ -72,14 +72,15 @@ Example:
 Use `ConnectionManager::add` to add one or more Connection instances. This allows you to use ActiveResource with any
 number of APIs within your code.
 
-Example:
+###### Example
     
     ConnectionManager::add('default', $connection);
 
 
 ## Response
-Because each and every API responds with its own unique payload and encoding, you must
-provide a response class that extends `\ActiveResource\ResponseAbstract`.
+Although ActiveResource comes with a basic Response class (that simply JSON decodes the response body), each and every
+API responds with its own unique payload and encoding and it is recommended you provide your own custom response class that
+extends `\ActiveResource\ResponseAbstract`.
 
 ### Required method implementation
 `parse` Accepts the raw payload contents from the response. Should return an array or \StdClass
@@ -93,7 +94,7 @@ The Response object is also a great way to include any other methods to access n
 related data or headers. It all depends on what data is in the response body for the API you
 are working with.
 
-Example:
+###### Example
     
     class Response extends \ActiveResource\ResponseAbstract
     {
@@ -109,12 +110,12 @@ Example:
         
         public function getMeta()
         {
-            return $this->payload->meta;
+            return $this->getPayload()->meta;
         }
         
         public function getEnvelope()
         {
-            return $this->pauload->envelope;
+            return $this->getPayload()->envelope;
         }
     }
     
@@ -139,7 +140,7 @@ In order for ActiveResource to properly hydrate your Model instances, the parsed
          ]
      }
 
-Example:
+###### Example
 
     {
         "id": "1234",
@@ -178,35 +179,38 @@ This can (and should) be done in your `Response` class `parse` method.
 
     
 ## Error
-Because each API responds differently for its errors, you must implement an Error class
-that extends `ErrorAbstract`. The `ErrorAbstract` class is instantiated with the parsed
-response body (thanks to the Response class you created).
-
-You must at a minimum implement the `getMessage` method.
+Although ActiveResource comes with a basic Error class, each API responds differently for its errors and it is
+highly recommended to implement your own Error class that extends `ErrorAbstract`. The `ErrorAbstract` class is
+instantiated with the Response instance.
 
 The Error object is also a great way to include any other methods to access other properties
 of the error response.
 
-Example:
+#### Required method implementation
+`getMessage` Should return the error message from the error response returned by the API.
+
+###### Example
 
     class Error extends \ActiveResource\ErrorAbstract
     {
+        /**
+        *   Get the error message returned by the API
+        */
         public function getMessage()
         {
-            return $this->payload->error->message;
+            return $this->getResponse()->getPayload()->error->message;
         }
         
         /**
-        *   Get the validation error field names
+        *   Get the validation error fields returned by the API
         */
         public function getFields()
         {
-            return $this->payload->error->fields;
+            return $this->getResponse()->getPayload()->error->fields;
         }
     }
 
 ## Models
-
 Create your model classes and extend them from `\ActiveResource\Model`.
 
 ##### Properties
@@ -255,7 +259,7 @@ model class.
 You can also define `public` methods with the same name as an instance property that the model will
 use to modify the data.
  
-Example:
+###### Example
 
     class Posts extends \ActiveResource\Model
     {
@@ -291,7 +295,7 @@ as its only parameter.
 Keep in mind the connection request property is an instance of a Psr7\Request object which means
 if you modify the request via any of its methods, it will return a *new* Psr7\Request instance.
 
-Example:
+###### Example
     
     class Authorize
     {
@@ -338,7 +342,7 @@ Or
 If the Authorization scheme is either Basic or Bearer, the easiest way to add the header is on the
 Guzzle client instance when creating the Connection object.
 
-Example:
+###### Example
         
         $client = new Client([
           'headers' => [
@@ -353,18 +357,18 @@ For Authorization schemas that are a bit more complex (eg HMAC), use a Middlewar
 No, you don't. Create a BaseModel class with the parseFind and parseAll methods. Then extend
 all your models from the BaseModel.
 
-##### The API I am working with responds in JSON-API, how do I deal with that?
+##### How do I handle JSON-API responses?
 In your parse method on the Response object, you'll need to do a lot of work, but it can be done. ActiveResource
 is looking for the parsed payload data to be in a specific format. See Expected Data Format for more information.
 
-##### I need to access response headers on some of my API calls. How do I do that?
+##### How do I access response headers?
 You can access the Response object for the last API request via the Model's `getResponse` method. The Response object
 has methods for retrieving response headers.
 
 ##### My API call is failing. How do I get access to the error response payload?
 You can access the Error object for the last API request via the model's `getError` method.
 
-##### I'd like to be able to automatically throw an exception on certain HTTP response codes. How do I do that?
+##### How can I throw an exception on certain HTTP response codes?
 The Response object has a protected array property called `throwable`. By default, HTTP Status 500 will throw an
 `ActiveResourceResponseException`. You can override the array in your Response class with any set of HTTP status
 codes you want. Or make it an empty array to *never* throw an exception.
