@@ -22,22 +22,61 @@ class Connection
     /** @var array  */
     protected $middlewareInstances = [];
 
+    /**
+     * The base URI to prepend to each request
+     */
+    const OPTION_BASE_URI = 'baseUri';
+
+    /**
+     * An array of key => value pairs to include in the query params with each request.
+     */
+    const OPTION_DEFAULT_QUERY_PARAMS = 'defaultQueryParams';
+
+    /**
+     * Request body format - either 'json', 'form', or null for pass-through
+     *
+     * Default: 'json'
+     */
+    const OPTION_REQUEST_BODY_FORMAT = 'requestBodyFormat';
+
+    /**
+     * Error class name
+     */
+    const OPTION_ERROR_CLASS = 'errorClass';
+
+    /**
+     * Response class name
+     */
+    const OPTION_RESPONSE_CLASS = 'responseClass';
+
+    /**
+     * HTTP method to use for updates
+     *
+     * Default: 'put'
+     */
+    const OPTION_UPDATE_METHOD = 'updateMethod';
+
+    /**
+     * If the API allows you to send *just* the modified fields on update, you can set this to true to help
+     * speed things up by making the request body smaller.
+     */
+    const OPTION_UPDATE_DIFF = false;
+
+    /**
+     * Array of class names to apply before each request is sent.
+     */
+    const OPTION_MIDDLEWARE = 'middleware';
+
     /** @var array  */
     protected $options = [
-        // Base URI will be prepended to each request URI
-        'baseUri' => null,
-
-        // The error class to use if the response is not successful
-        'errorClass' => null,
-
-        // The response class to use
-        'responseClass' => Response::class,
-
-        // The http method to use for updating a resource (usually PUT but some APIs use PATCH)
-        'updateMethod' => 'PUT',
-
-        // Array of class names to run as Middleware before each request is sent
-        'middleware' => [],
+        self::OPTION_BASE_URI => null,
+        self::OPTION_DEFAULT_QUERY_PARAMS => [],
+        self::OPTION_REQUEST_BODY_FORMAT => 'json',
+        self::OPTION_ERROR_CLASS => null,
+        self::OPTION_RESPONSE_CLASS => null,
+        self::OPTION_UPDATE_METHOD => 'put',
+        self::OPTION_UPDATE_DIFF => false,
+        self::OPTION_MIDDLEWARE => [],
     ];
 
     /**
@@ -110,16 +149,23 @@ class Connection
     }
 
     /**
-     * @param $method
-     * @param $url
-     * @param null $queryParams
-     * @param null $body
+     * @param string $method
+     * @param string $url
+     * @param array $queryParams
+     * @param mixed|null $body
      * @param array $headers
      * @return Request
      */
-    public function buildRequest($method, $url, $queryParams = null, $body = null, array $headers = [])
+    public function buildRequest($method, $url, array $queryParams = [], $body = null, array $headers = [])
     {
         $method = strtoupper($method);
+
+        if( $queryParams == null ){
+            $queryParams = [];
+        }
+
+        // Merge in default query params
+        $queryParams = array_merge($queryParams, $this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS));
 
         // Apply query parameters to URI
         if( !empty($queryParams) ) {
@@ -136,13 +182,22 @@ class Connection
 
         // Process the body
         if( $body ){
-            if( is_array($body) ){
+            $format = $this->getOption(self::OPTION_REQUEST_BODY_FORMAT);
+
+            if( $format == 'json' ){
+                $headers['Content-Type'] = 'application/json';
                 $body = json_encode($body);
             }
+
+            if( $format == 'form' ){
+                $headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                $body = http_build_query($body, null, '&');
+            }
+
         }
 
         // Prepend base URI
-        $url = $this->getOption('baseUri') . $url;
+        $url = $this->getOption(self::OPTION_BASE_URI) . $url;
 
 
         return new Request($method, $url, $headers, $body);
@@ -260,24 +315,11 @@ class Connection
     }
 
     /**
-     * @param $url
-     * @param array $queryParams
-     * @param array $headers
-     * @return ResponseAbstract
-     */
-    public function options($url, array $queryParams = [], array $headers = [])
-    {
-        $this->request = $this->buildRequest('OPTIONS', $url, $queryParams, $headers);
-        $this->runMiddleware();
-        return $this->call($this->request);
-    }
-
-    /**
      * @return string
      */
     public function getResponseClass()
     {
-        return $this->getOption('responseClass');
+        return $this->getOption(self::OPTION_RESPONSE_CLASS);
     }
 
     /**
@@ -285,7 +327,7 @@ class Connection
      */
     public function getErrorClass()
     {
-        return $this->getOption('errorClass');
+        return $this->getOption(self::OPTION_ERROR_CLASS);
     }
 
     /**
@@ -293,7 +335,7 @@ class Connection
      */
     public function getUpdateMethod()
     {
-        $method = $this->getOption('updateMethod');
+        $method = $this->getOption(self::OPTION_UPDATE_METHOD);
 
         if( empty($method) ){
             return 'put';
@@ -307,7 +349,7 @@ class Connection
      */
     protected function runMiddleware()
     {
-        foreach( $this->getOption('middleware') as $middleware )
+        foreach( $this->getOption(self::OPTION_MIDDLEWARE) as $middleware )
         {
             $instance = $this->getMiddlewareInstance($middleware);
             $instance->run($this);

@@ -128,11 +128,16 @@ abstract class Model
                 return true;
             }
 
+            // Can we just send the dirty fields?
+            if( $this->getConnection()->getOption(Connection::OPTION_UPDATE_DIFF) ){
+                $data = $this->dirty;
+            }
+
             // Get the update method (usually either PUT or PATCH)
             $method = $connection->getUpdateMethod();
 
             // Do the update
-            $this->response = $connection->{$method}($this->getResourceUri(), $queryParams, $this->dirty, $headers);
+            $this->response = $connection->{$method}($this->getResourceUri(), $queryParams, $data, $headers);
         }
 
         // Looks like a good response, re-hydrate object, and reset the dirty fields
@@ -368,7 +373,14 @@ abstract class Model
     public function getResourceName()
     {
         if( empty($this->resourceName) ){
-            return strtolower(class_basename($this));
+
+            $class = get_called_class();
+
+            if( ($pos = strrpos($class, '\\')) ) {
+                return substr($class, $pos + 1);
+            }
+
+            return $class;
         }
 
         return $this->resourceName;
@@ -443,7 +455,7 @@ abstract class Model
             return true;
         }
 
-        throw new ActiveResourceException('Invalid data blob');
+        throw new ActiveResourceException('Failed to hydrate. Invalid payload data format.');
     }
 
 
