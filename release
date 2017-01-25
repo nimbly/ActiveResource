@@ -6,7 +6,8 @@ $currentVersion = file_get_contents('VERSION');
 if( isset($argv[1]) ) {
     $version = $argv[1];
 } else {
-	echo "\nERROR: You must provide a version.\n\n";
+	echo "\nCurrent version: {$currentVersion}\n";
+	echo "\n\nERROR: You must provide a version.\n\n";
 	exit;
 }
 
