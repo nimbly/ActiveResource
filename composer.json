@@ -1,0 +1,36 @@
+{
+    "name": "nimbly\/activeresource",
+    "version": "0.1",
+    "description": "Use a RESTful resource based API like a database",
+    "keywords": [
+        "api",
+        "php",
+        "resource",
+        "database",
+        "activerecord",
+        "active",
+        "record"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Brent Scheffler",
+            "email": "brent@nimbly.io"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "ActiveResource\\": "src\/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https:\/\/github.com\/nimbly\/ActiveResource"
+        }
+    ],
+    "require": {
+        "php": "^5.3.3 || ^7.0",
+        "guzzlehttp\/guzzle": "^6.2"
+    }
+}
