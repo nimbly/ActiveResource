@@ -377,10 +377,14 @@ abstract class Model
             $class = get_called_class();
 
             if( ($pos = strrpos($class, '\\')) ) {
-                return substr($class, $pos + 1);
+                $resourceName = substr($class, $pos + 1);
             }
 
-            return $class;
+            else {
+                $resourceName = $class;
+            }
+
+            $this->resourceName = strtolower($resourceName);
         }
 
         return $this->resourceName;
