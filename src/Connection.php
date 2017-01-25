@@ -24,34 +24,49 @@ class Connection
 
     /**
      * The base URI to prepend to each request
+     *
+     * Type: string
+     * Default: null
      */
     const OPTION_BASE_URI = 'baseUri';
 
     /**
      * An array of key => value pairs to include in the query params with each request.
+     *
+     * Type: array
+     * Default: []
      */
     const OPTION_DEFAULT_QUERY_PARAMS = 'defaultQueryParams';
 
     /**
      * Request body format - either 'json', 'form', or null for pass-through
      *
+     * Type: string
+     * Options: 'json', 'form', null
      * Default: 'json'
      */
     const OPTION_REQUEST_BODY_FORMAT = 'requestBodyFormat';
 
     /**
      * Error class name
+     *
+     * Type: string
+     * Default: null
      */
     const OPTION_ERROR_CLASS = 'errorClass';
 
     /**
      * Response class name
+     *
+     * Type: string
+     * Default: null
      */
     const OPTION_RESPONSE_CLASS = 'responseClass';
 
     /**
      * HTTP method to use for updates
      *
+     * Type: string
      * Default: 'put'
      */
     const OPTION_UPDATE_METHOD = 'updateMethod';
@@ -59,11 +74,17 @@ class Connection
     /**
      * If the API allows you to send *just* the modified fields on update, you can set this to true to help
      * speed things up by making the request body smaller.
+     *
+     * Type: boolean
+     * Default: false
      */
-    const OPTION_UPDATE_DIFF = false;
+    const OPTION_UPDATE_DIFF = 'updateDiff';
 
     /**
      * Array of class names to apply before each request is sent.
+     *
+     * Type: array
+     * Default: []
      */
     const OPTION_MIDDLEWARE = 'middleware';
 
