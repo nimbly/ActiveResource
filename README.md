@@ -221,50 +221,74 @@ Create your model classes and extend them from `\ActiveResource\Model`.
 `resourceIdentifier` Name of the field to use as the ID. Defaults to `id`.
 
 ##### Static methods
-`find` Find a single instance of a resource. Assumes payload will return *single* object.
+`find` Find a single instance of a resource given its ID. Assumes payload will return *single* object.
 
 `all` Get all instances of a resource. Assumes payload will return an *array* of objects.
 
-`remove` Delete a resource.
+`delete` Destroy (delete) a resource given its ID. 
 
 `findThrough` Find a resource *through* another resource. For example, if you have to retrieve
 a comment through its post `/posts/1234/comments/5678`.
 
 `allThrough` Get all instances of a resource *through* another resource. For example, if you have
-to retrieve comments through its post `/posts/1235/comments`.
+to retrieve comments through its post `/posts/1234/comments`.
 
 ##### Instance methods
 `fill` Mass assign object properties with an array of key/value pairs.
 
 `save` Save or update the instance.
 
-`delete` Delete the instance.
+`destroy` Destroy (delete) the instance.
 
 `getResponse` Get the `Response` object for the last request.
 
 `getError` Get the `Error` object for the last request.
 
-`parseFind` Tells the Model class where to look for the payload data for a single resource. Expects
-single parameter containing the parsed/decoded payload.
+`parseFind` Tells the Model class where in the payload to look for the data for a single resource. This method is called when using the
+            `find` static method or the `save` instance method. The `parseFind` method accepts a
+            single parameter containing the parsed/decoded payload and should return an object or an associative array containing the instance
+            data. If you do not specify this method on your model, ActiveResource will pass the full payload to hydrate the model.
+            Unless the API you are working with returns all relevant data in the root of the response, you *need* to implement
+            this method. See Expected Data Format for more information.
 
-`parseAll` Tells the Model class where to look for the payload data for an array of resources. Expects
-single parameter containing the parsed/decoded payload.
+`parseAll` Tells the Model class where in the payload to look for the data for an array of resources. This method is called when using the
+           `all` static method. This method accepts a single parameter containing the parsed/decoded payload and should return an
+           object or an associative array containing the instance data. If you do not specify this method on your model,
+           ActiveResource will pass the full payload to hydrate the model. Unless the API you are working with returns all relevant data in the root of the response, you *need* to implement
+           this method.See Expected Data Format for more information.
 
 `includesOne` Tells the Model class that the response includes a single instance of another
-model class.
+model class. ActiveResource will then create an instance of the model and hydrate with the data.
 
 `includesMany` Tells the Model class that the response includes an array of instances of another
-model class.
+model class. ActiveResource will then create a Collection of hydrated model instances.
 
-You can also define `public` methods with the same name as an instance property that the model will
-use to modify the data.
+You can also define `public` methods with the same name as an instance property that the model will send the data to. You
+can then modify the data or more commonly, create a new model instance representing the data.
  
-###### Example
+For example, say you are interacting with a blog API that has blog posts, users, and comments. You create the three model
+classes representing the API resources.
+
+###### Users
+
+    class Users extends \ActiveResource\Model
+    {
+    }
+     
+###### Comments
+
+    class Comments extends \ActiveResource\Model
+    {
+        public function author($data)
+        {
+            return $this->includesOne(Users::class, $data);
+        }
+    }
+
+###### Posts
 
     class Posts extends \ActiveResource\Model
     {
-        protected $connectionName = 'sample-api';
-        
         public function author($data)
         {
             return $this->includesOne(Users::class, $data);
@@ -275,16 +299,70 @@ use to modify the data.
             return $this->includesMany(Comments::class, $data);
         }
         
-        public function parseFind($payload)
+        /**
+        * You can find the blog post data in $.data.post in the payload
+        */
+        protected function parseFind($payload)
         {
             return $payload->data->post;
         }
         
-        public function parseAll($payload)
+        /**
+        * You can find the collection of post data in $.data.posts in the payload
+        */
+        protected function parseAll($payload)
         {
             return $payload->data->posts;
         }
     }
+
+Now grab blog post ID 7.
+ 
+    `$posts = Posts::find(7);`
+    
+The response from the API looks like:
+
+    {
+        data: {
+            post: {
+                id: 7,
+                title: "Blog post",
+                body: "I am a short blog post",
+                author: {
+                    id: 123,
+                    name: "John Doe",
+                    email: "jdoe@example.com"
+                },
+                created_at: "2016-12-03 15:36:12",
+                comments: [
+                    {
+                        id: 8,
+                        body: "Great article!",
+                        author: {
+                            id: 567,
+                            name: "Thomas Quigley",
+                            email: "tquigley@example.com"
+                        },
+                        created_at: "2016-12-04 09:18:45"
+                    },
+                        
+                    {
+                        id: 9,
+                        body: "Love the way your write",
+                        author: {
+                            id: 4178,
+                            name: "Jane Johnson",
+                            email: "jjohnson@example.com"
+                        },
+                        created_at: "2016-12-04 11:29:18"
+                    }
+                ]
+            }
+        }
+    }            
+    
+ActiveResource will automatically hydrate model instances for comments and authors (users) on the Posts instance. These instances
+ can then be modified and updated or even deleted.
 
 ## Middleware
 
@@ -308,7 +386,7 @@ if you modify the request via any of its methods, it will return a *new* Psr7\Re
 ## Examples
 
 ### Find a single resource
-    $user = User::find($id);
+    $user = User::find(123);
 
 ### Get all resources
     $users = User::all();
@@ -320,22 +398,25 @@ if you modify the request via any of its methods, it will return a *new* Psr7\Re
     $user->save();
     
 ### Updating a resource
-    $user = User::find($id);
+    $user = User::find(123);
     $user->status = 'INACTIVE';
     $user->save();
     
 ### Quickly assign properties
     $user = User::find($id);
-    $user->fill($requestData);
+    $user->fill([
+        'name' => 'Buckley',
+        'email' => 'buckley@example.com',
+    ]);
     $user->save();
     
-### Delete a resource
+### Destroy (delete) a resource
     $user = User::find($id);
-    $user->delete();
+    $user->destory();
 
 Or
     
-    User::remove($id);
+    User::delete($id);
 
 ## FAQ
 ##### How do I send an Authorization header with every request?

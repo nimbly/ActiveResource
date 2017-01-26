@@ -142,14 +142,7 @@ abstract class Model
 
         // Looks like a good response, re-hydrate object, and reset the dirty fields
         if( $this->response->isSuccessful() ){
-
-            if( method_exists($this, 'parseFind') ){
-                $data = $this->parseFind($this->response->getPayload());
-            }
-            else {
-                $data = $this->response->getPayload();
-            }
-
+            $data = $this->parseFind($this->response->getPayload());
             $this->error = null;
             $this->hydrate($data);
             $this->dirty = [];
@@ -168,14 +161,14 @@ abstract class Model
     }
 
     /**
-     * Delete the resource
+     * Destroy (delete) the resource
      *
      * @param array $queryParams
      * @param array $headers
      *
      * @return bool
      */
-    public function delete(array $queryParams = [], array $headers = [])
+    public function destroy(array $queryParams = [], array $headers = [])
     {
         $connection = $this->getConnection();
 
@@ -415,6 +408,32 @@ abstract class Model
     }
 
     /**
+     * Where to find the single resource data from the response payload.
+     *
+     * You should overwrite this method in your model class to suite your needs.
+     *
+     * @param $payload
+     * @return mixed
+     */
+    protected function parseFind($payload)
+    {
+        return $payload;
+    }
+
+    /**
+     * Where to find the array of data from the response payload.
+     *
+     * You should overwrite this method in your model class to suite your needs.
+     *
+     * @param $payload
+     * @return mixed
+     */
+    protected function parseAll($payload)
+    {
+        return $payload;
+    }
+
+    /**
      * Hydrate
      *
      * @param $data
@@ -491,14 +510,7 @@ abstract class Model
 
         if( $response->isSuccessful() ) {
             $instance->response = $response;
-
-            if( method_exists($instance, 'parseFind') ){
-                $data = $instance->parseFind($response->getPayload());
-            }
-            else {
-                $data = $response->getPayload();
-            }
-
+            $data = $instance->parseFind($response->getPayload());
             $instance->hydrate($data);
             return $instance;
         }
@@ -568,7 +580,7 @@ abstract class Model
      *
      * @return bool
      */
-    public static function remove($id, array $queryParams = [], array $headers = [])
+    public static function delete($id, array $queryParams = [], array $headers = [])
     {
         $className = get_called_class();
 
@@ -642,14 +654,7 @@ abstract class Model
 
         if( $response->isSuccessful() ) {
             $instance->response = $response;
-
-            if( method_exists($instance, 'parseFind') ){
-                $data = $instance->parseFind($response->getPayload());
-            }
-            else {
-                $data = $response->getPayload();
-            }
-
+            $data = $instance->parseFind($response->getPayload());
             $instance->hydrate($data);
             return $instance;
         }
