@@ -42,7 +42,14 @@ abstract class ResponseAbstract
     protected $throwable = [500];
 
     /**
-     * The fully decoded payload
+     * Raw response body
+     *
+     * @var
+     */
+    protected $body;
+
+    /**
+     * The fully parsed/decoded payload
      * @var mixed
      */
     protected $payload;
@@ -56,7 +63,8 @@ abstract class ResponseAbstract
         $this->statusCode = $response->getStatusCode();
         $this->statusPhrase = $response->getReasonPhrase();
         $this->headers = $response->getHeaders();
-        $this->payload = $this->parse($response->getBody()->getContents());
+        $this->body = $response->getBody()->getContents();
+        $this->payload = $this->parse($this->body);
     }
 
     /**
@@ -113,7 +121,17 @@ abstract class ResponseAbstract
     }
 
     /**
-     * Get the decoded response payload
+     * Get the raw (pre-parsed/decoded) response body
+     *
+     * @return string
+     */
+    public function getBody()
+    {
+        return $this->body;
+    }
+
+    /**
+     * Get the parsed/decoded response payload
      *
      * @return mixed
      */
@@ -133,12 +151,12 @@ abstract class ResponseAbstract
     }
 
     /**
-     * Parse the response for processing
+     * Parse/decode the response body for processing
      *
-     * @param string $payload
+     * @param string $body
      * @return mixed
      */
-    abstract public function parse($payload);
+    abstract public function parse($body);
 
     /**
      * Whether this request was successful or not

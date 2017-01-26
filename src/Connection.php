@@ -9,10 +9,10 @@
 namespace ActiveResource;
 
 
+use ActiveResource\Request;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\ConnectException;
-use GuzzleHttp\Psr7\Request;
 use Psr\Http\Message\ResponseInterface;
 
 class Connection
@@ -23,6 +23,9 @@ class Connection
     /** @var array  */
     protected $middlewareInstances = [];
 
+    /** @var array  */
+    protected $log = [];
+
     /**
      * The base URI to prepend to each request
      *
@@ -30,6 +33,14 @@ class Connection
      * Default: null
      */
     const OPTION_BASE_URI = 'baseUri';
+
+    /**
+     * An array of key => value pairs to include in the headers with each request.
+     *
+     * Type: array
+     * Default: []
+     */
+    const OPTION_DEFAULT_HEADERS = 'defaultHeaders';
 
     /**
      * An array of key => value pairs to include in the query params with each request.
@@ -89,9 +100,18 @@ class Connection
      */
     const OPTION_MIDDLEWARE = 'middleware';
 
+    /**
+     * Keep a log of all calls made
+     *
+     * Type: boolean
+     * Default: false
+     */
+    const OPTION_LOG = 'log';
+
     /** @var array  */
     protected $options = [
         self::OPTION_BASE_URI => null,
+        self::OPTION_DEFAULT_HEADERS => [],
         self::OPTION_DEFAULT_QUERY_PARAMS => [],
         self::OPTION_REQUEST_BODY_FORMAT => 'json',
         self::OPTION_ERROR_CLASS => Error::class,
@@ -99,6 +119,7 @@ class Connection
         self::OPTION_UPDATE_METHOD => 'put',
         self::OPTION_UPDATE_DIFF => false,
         self::OPTION_MIDDLEWARE => [],
+        self::OPTION_LOG => false,
     ];
 
     /**
@@ -182,12 +203,11 @@ class Connection
     {
         $method = strtoupper($method);
 
-        if( $queryParams == null ){
-            $queryParams = [];
-        }
+        // Merge in default headers
+        $headers = array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS), $headers);
 
         // Merge in default query params
-        $queryParams = array_merge($queryParams, $this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS));
+        $queryParams = array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS), $queryParams);
 
         // Apply query parameters to URI
         if( !empty($queryParams) ) {
@@ -215,12 +235,10 @@ class Connection
                 $headers['Content-Type'] = 'application/x-www-form-urlencoded';
                 $body = http_build_query($body, null, '&');
             }
-
         }
 
         // Prepend base URI
         $url = $this->getOption(self::OPTION_BASE_URI) . $url;
-
 
         return new Request($method, $url, $headers, $body);
     }
@@ -233,7 +251,8 @@ class Connection
      */
     public function send(Request $request)
     {
-        return $this->httpClient->send($request);
+        $response = $this->httpClient->send($request->newPsr7Request());
+        return $response;
     }
 
     /**
@@ -245,15 +264,38 @@ class Connection
      */
     protected function call(Request $request)
     {
+        $start = microtime(true);
+
         try {
             $response = $this->send($request);
         } catch( BadResponseException $badResponseException ){
             $response = $badResponseException->getResponse();
         }
 
+        $stop = microtime(true);
+
         /** @var ResponseAbstract $response */
         $responseClass = $this->getResponseClass();
         $response = new $responseClass($response);
+
+        // If we're logging requests, save the response body and build the log record
+        if( $this->getOption(self::OPTION_LOG) ){
+            $this->log[] = [
+                'request' => [
+                    'method' => $request->getMethod(),
+                    'url' => $request->getUrl(),
+                    'headers' => $request->getHeaders(),
+                    'body' => $request->getBody(),
+                ],
+                'response' => [
+                    'status' => $response->getStatusCode(),
+                    'phrase' => $response->getStatusPhrase(),
+                    'headers' => $response->getHeaders(),
+                    'body' => $response->getBody(),
+                ],
+                'time' => $stop - $start,
+            ];
+        }
 
         return $response;
     }
@@ -336,7 +378,7 @@ class Connection
      */
     public function delete($url, array $queryParams = [], array $headers = [])
     {
-        $this->request = $this->buildRequest('DELETE', $url, $queryParams, $headers);
+        $this->request = $this->buildRequest('DELETE', $url, $queryParams, null, $headers);
         $this->runMiddleware();
         return $this->call($this->request);
     }
@@ -352,7 +394,7 @@ class Connection
      */
     public function head($url, array $queryParams = [], array $headers = [])
     {
-        $this->request = $this->buildRequest('HEAD', $url, $queryParams, $headers);
+        $this->request = $this->buildRequest('HEAD', $url, $queryParams, null, $headers);
         $this->runMiddleware();
         return $this->call($this->request);
     }
@@ -385,6 +427,14 @@ class Connection
         }
 
         return strtolower($method);
+    }
+
+    /**
+     * @return array
+     */
+    public function getLog()
+    {
+        return $this->log;
     }
 
     /**

@@ -12,14 +12,14 @@ namespace ActiveResource;
 class Response extends ResponseAbstract
 {
     /**
-     * Parse/decode the response payload
+     * Parse/decode the response body
      *
-     * @param string $payload
+     * @param string $body
      * @return mixed
      */
-    public function parse($payload)
+    public function parse($body)
     {
-        return json_decode($payload);
+        return json_decode($body);
     }
 
     /**

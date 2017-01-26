@@ -387,6 +387,7 @@ abstract class Model
         return ConnectionManager::get($this->connectionName);
     }
 
+
     /**
      * Is this entity dirty?
      *

@@ -32,20 +32,25 @@ The options array may contain:
 
 `defaultUri` *string* The default URI to prepend to each request. For example: `http://some.api.com/v2/`
 
-`defaultQueryParms` *array* Key => value pairs to include in the query with every request.
+`defaultHeaders` *array* Key => value pairs of headers to include with every request.
 
-`errorClass` *string* Class name of the Error class to use for interacting with error responses from the API. See Error
-section for more info.
+`defaultQueryParams` *array* Key => value pairs to include in the query with every request.
 
-`responseClass` *string* Class name of the Response class to use for parsing responses including headers and body. See
-Response section for more info.
+`errorClass` *string* Class name of the Error class to use for interacting with error responses from the API. Default
+is ActiveResource's default Error class. See Error section for more info.
 
-`updateMethod` *string* HTTP method to use for updates, defaults to `put`.
+`responseClass` *string* Class name of the Response class to use for parsing responses including headers and body. Default
+is ActiveResource's default Response class. SeeResponse section for more info.
+
+`updateMethod` *string* HTTP method to use for updates. Defaults to `put`.
 
 `updateDiff` *boolean* Whether ActiveResource can send just the modified fields of the resource on an update.
 
 `middleware` *array* An array of middleware classes to run before sending each request. See Middleware section for more
 info.
+
+`log` *boolean* Tell ActiveResource to log all requests and responses. Defaults to `false`. Do not use this option
+in production environments. You can access the log via the Connection getLog() method via the ConnectionManager.
 
 ##### HttpClient
 An optional instance of `GuzzleHttp\Client`. If you do not provide an instance, one will be created automatically
@@ -382,8 +387,28 @@ if you modify the request via any of its methods, it will return a *new* Psr7\Re
             $connection->request = $connection->request->withHeader('X-Foo-Header', 'Bar');
         }
     }
+    
+## Logging
 
-## Examples
+You can activate request and response logging of every ActiveResource call by enabling the `log` option on a Connection.
+To access the log data, call the `getLog` method on the connection. Due to memory footprint and security reasons, *do not*
+use logging in production environments.
+
+###### Example
+
+    $connection = new Connection([
+        'defaultUri' => 'https://someurl.com/v1/',
+        'log' => true,
+    ]);
+    
+    ConnectionManager::add('default', $connection);
+    
+    // Do some stuff, make some API calls
+
+    $connection = ConnectionManager::get('default');
+    $log = $connection->getLog();
+
+## Quick Start Examples
 
 ### Find a single resource
     $user = User::find(123);
@@ -420,17 +445,19 @@ Or
 
 ## FAQ
 ##### How do I send an Authorization header with every request?
-If the Authorization scheme is either Basic or Bearer, the easiest way to add the header is on the
-Guzzle client instance when creating the Connection object.
+If the Authorization scheme is either Basic or Bearer, the easiest way to add the header is in the
+options array when creating the Connection object.
 
 ###### Example
         
-        $client = new Client([
-          'headers' => [
-              'Authorization' => 'Bearer MYAPITOKEN',
-        ]);
+        $options = [
+            'defaultUri' => 'http://myapi.com/v2/',
+            'defaultHeaders' => [
+                'Authorization' => 'Bearer MYAPITOKEN',
+            ],        
+        ];
         
-        $connection = new Connection($options, $client);
+        $connection = new Connection($options);
         
 For Authorization schemas that are a bit more complex (eg HMAC), use a Middleware approach.
 
