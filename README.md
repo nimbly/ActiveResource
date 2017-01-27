@@ -75,11 +75,15 @@ with no options set.
 ### ConnectionManager
 
 Use `ConnectionManager::add` to add one or more Connection instances. This allows you to use ActiveResource with any
-number of APIs within your code.
+number of APIs within your code. If you interact mostly with a single API, you can set the name to `default` without
+needing to specify the connection name on each of your models.
+
+If you *do* need to interact with multiple APIs, be sure to give them distinct connection names. You'll likely want to
+create an abstract BaseModel with the connectionName property set and extend your actual models from the BaseModel.
 
 ###### Example
     
-    ConnectionManager::add('default', $connection);
+    ConnectionManager::add('yourConnectionName', $connection);
 
 
 ## Response
@@ -323,7 +327,7 @@ classes representing the API resources.
 
 Now grab blog post ID 7.
  
-    `$posts = Posts::find(7);`
+    $posts = Posts::find(7);
     
 The response from the API looks like:
 
@@ -389,7 +393,7 @@ as its only parameter.
     
 ## Logging
 
-You can activate request and response logging of every ActiveResource call by enabling the `log` option on a Connection.
+You can activate request and response logging of every ActiveResource call by enabling the `log` option on a `Connection`.
 To access the log data, call the `getLog` method on the connection. Due to memory footprint and security reasons, *do not*
 use logging in production environments.
 
@@ -400,12 +404,20 @@ use logging in production environments.
         'log' => true,
     ]);
     
-    ConnectionManager::add('default', $connection);
+    ConnectionManager::add('yourConnectionName', $connection);
     
-    // Do some stuff, make some API calls
+    $post = Post::find(12);
 
-    $connection = ConnectionManager::get('default');
+    $connection = ConnectionManager::get('yourConnectionName');
     $log = $connection->getLog();
+    
+Or
+    
+    $post->getConnection()->getLog();
+    
+Or
+
+    Post::connection()->getLog();
 
 ## Quick Start Examples
 
@@ -445,7 +457,7 @@ Or
 ## FAQ
 ##### How do I send an Authorization header with every request?
 If the Authorization scheme is either Basic or Bearer, the easiest way to add the header is in the
-options array when creating the Connection object.
+`defaultHeaders` option array when creating the Connection object.
 
 ###### Example
         
@@ -458,24 +470,35 @@ options array when creating the Connection object.
         
         $connection = new Connection($options);
         
-For Authorization schemas that are a bit more complex (eg HMAC), use a Middleware approach.
+For Authorization schemas that are a bit more complex (eg HMAC), use a Middleware approach. See the Middleware section
+for more information.
 
-##### The API response payload I am working with has all its data returned in the same path. Do I really need to have a parseFind and parseAll method on every model?
-No, you don't. Create a BaseModel class with the parseFind and parseAll methods. Then extend
-all your models from the BaseModel.
+##### The API response payload I am working with has all its data returned in the same root path. Do I really need to have a parseFind and parseAll method on every model?
+No, you don't. Create an abstract BaseModel class with the `parseFind` and `parseAll` methods. Then extend
+all your models from that BaseModel.
 
 ##### How do I handle JSON-API responses?
-In your parse method on the Response object, you'll need to do a lot of work, but it can be done. ActiveResource
+In your `Response` object `parse` method you'll need to do a lot of work, but it can be done. ActiveResource
 is looking for the parsed payload data to be in a specific format. See Expected Data Format for more information.
 
 ##### How do I access response headers?
-You can access the Response object for the last API request via the Model's `getResponse` method. The Response object
+You can access the `Response` object for the last API request via the Model's `getResponse` method. The `Response` object
 has methods for retrieving response headers.
 
 ##### My API call is failing. How do I get access to the error response payload?
-You can access the Error object for the last API request via the model's `getError` method.
+You can access the `Error` object for the last API request via the model's `getError` method.
 
 ##### How can I throw an exception on certain HTTP response codes?
-The Response object has a protected array property called `throwable`. By default, HTTP Status 500 will throw an
-`ActiveResourceResponseException`. You can override the array in your Response class with any set of HTTP status
+The `Response` object has a protected array property called `throwable`. By default, HTTP Status 500 will throw an
+`ActiveResourceResponseException`. You can override the array in your `Response` class with any set of HTTP status
 codes you want. Or make it an empty array to *never* throw an exception.
+
+Connection issues including timeouts will *always* throw a `GuzzleHttp\Exception\ConnectException`.
+
+##### The API I am working with has an endpoint that simply does not conform to the ActiveResource pattern, how can I call the endpoint?
+You can interact directly with the `Connection` object's `get`, `post`, `put`, `patch`, and `delete` methods.
+
+    $connection = ConnectionManager::get('yourConnectionName');
+    $response = $connection->get('some/oddball/endpoint', ['status' => 'foo']);
+    
+You'll get a `Response` object back and will need to manually decode and parse the response yourself.
