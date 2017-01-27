@@ -16,7 +16,186 @@ If you have any suggestions or potential feature requests, feel free to ping me.
 ## Installation
 
     composer require nimbly/activeresource
+    
+## Quick start
 
+This quick start guide assumes the API:
+
+1. Accepts and responds JSON (application/json)
+2. Uses HTTP response codes to indicate response status (200 OK, 404 Not Found, 400 Bad Request, etc)
+3. Is resource based - you interact with nouns (resources), not verbs
+
+If the API you are working with doesn't have these assumptions, that's okay, just be sure to read the documentation
+for full configuration options, custom `Response` and `Error` classes, and Middleware.
+
+#### Create the connection
+    
+    $options = [
+        Connection::OPTION_BASE_URI => 'https://someapi.com/v1/',
+        Connection::OPTION_DEFAULT_HEADERS => [
+            'Authorization' => 'Bearer MYAPITOKEN',
+        ]
+    ];
+    
+    $connection = new Connection($options);
+    
+#### Add connection to ConnectionManager
+    
+    ConnectionManager::add('default', $connection);
+    
+#### Create your models
+
+    use ActiveResource\Model;
+    
+    /**
+    * Because the class name is "Users", ActiveResource assumes the API endpoint for this resource is "users".
+    */
+    class Users extends Model
+    {
+        /**
+        * The single user object can be found at $.data.user
+        *
+        * Sample parsed payload:
+        *
+        *    {
+        *        "data": {
+        *            "user": {
+        *                "id": "1",
+        *                "name": "Foo Bar",
+        *                "email": "foo@bar.com"
+        *            }
+        *        }
+        *    }
+        *         
+        *
+        */
+        protected function parseFind($payload)
+        {
+            return $payload->data->user;
+        }
+        
+        protected function parseAll($payload)
+        {
+            return $payload->data->users;
+        }
+
+    }
+    
+    
+    /**
+    * Because the class name is "Posts", ActiveResource assumes the API endpoint for this resource is "posts".
+    */
+    class Posts extends Model
+    {
+        // Manually set the endpoint for this resource. Now ActiveResource will hit "blogs" when making calls
+        // from this model.
+        protected $resourceName = 'blogs';
+    
+    
+        /**
+        * A blog post has an author object embedded in the response that
+        * maps to a User object.
+        */
+        protected function author($data)
+        {
+            return $this->includesOne(Users::class, $data);
+        }
+    
+        protected function parseFind($payload)
+        {
+            return $payload->data->post;
+        }
+        
+        protected function parseAll($payload)
+        {
+            return $payload->data->posts;
+        }
+         
+    }
+    
+    class Comments extends Model
+    {
+    
+        /**
+        * A comment has an author object embedded in the response that
+        * maps to a User object.
+        */
+        protected function author($data)
+        {
+            return $this->includesOne(Users::class, $data);
+        }
+        
+        
+        protected function parseFind($payload)
+        {
+            return $payload->data->comment;
+        }
+        
+        protected function parseAll($payload)
+        {
+            return $payload->data->comments;
+        }
+        
+    }
+
+#### Use your models
+
+    $user = new User;
+    $user->name = 'Brent Scheffler';
+    $user->email = 'brent@brentscheffler.com';
+    $user->save();
+    
+    $post = new Posts;
+    $post->title = 'Blog post';
+    $post->body = 'World\'s shortest blog post';
+    $post->author_id = $user->id;
+    $post->save();
+    
+    // Update the author (user)
+    $post->author->email = 'brent@nimbly.io';
+    
+    // Oops, save failed... Wonder what happened.
+    if( $post->author->save() == false )
+    {
+        // Looks like that email address is already being used
+        $code = $post->getError()->getStatusCode(); // 409
+        $error = $post->getError()->getMessage(); // Conflict    
+    }
+    
+    // Get user ID=1
+    $user = User::find(1);
+    
+    // Update the user
+    $user->status = 'inactive';
+    $user->save();
+
+    // Get all the users
+    $users = Users::all();
+    
+    // Pass in some query params to find only active users
+    $users = Users::all(['status' => 'active']);
+
+    // Delete user ID=1
+    $user->delete();
+    
+    // Get the response code
+    $statusCode = $user->getResponse()->getStatusCode(); // 204 No Content
+
+    // Pass in a specific header for this call
+    $post = Posts::all([], ['X-Header-Foo' => 'Bar']);
+    
+    // Get blog post ID=1
+    $post = Posts::find(1);
+    
+    // Get all comments through Posts resource. The effective query would be GET#/blogs/1/comments
+    $comments = Comments::allThrough($post);
+    
+    // Or...
+    $comments = Comments::allThrough("blogs/1");
+
+#### That's it
+That's all there really is to using ActiveResource. Hopefully your API is mostly [RMM Level 2](https://martinfowler.com/articles/richardsonMaturityModel.html#level2)
+ making configuration a breeze.
 
 ## Configuration
 ActiveResource lets you connect to any number of RESTful APIs within your code.
