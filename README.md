@@ -375,16 +375,15 @@ You can modify and interact with the `Connection` object before it sends its req
 A middleware class must implement a public `run` method and accepts the `Connection` instance
 as its only parameter.
 
-Keep in mind the connection request property is an instance of a Psr7\Request object which means
-if you modify the request via any of its methods, it will return a *new* Psr7\Request instance.
-
 ###### Example
     
     class Authorize
     {
         public function run(\ActiveResource\Connection $connection)
         {
-            $connection->request = $connection->request->withHeader('X-Foo-Header', 'Bar');
+            if( $connection->request->getMethod() == 'patch' ){
+                $connection->request->setHeader('X-Foo-Header', 'Bar');
+            }
         }
     }
     

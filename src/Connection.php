@@ -114,8 +114,8 @@ class Connection
         self::OPTION_DEFAULT_HEADERS => [],
         self::OPTION_DEFAULT_QUERY_PARAMS => [],
         self::OPTION_REQUEST_BODY_FORMAT => 'json',
-        self::OPTION_ERROR_CLASS => Error::class,
-        self::OPTION_RESPONSE_CLASS => Response::class,
+        self::OPTION_ERROR_CLASS => 'ActiveResource\\Error',
+        self::OPTION_RESPONSE_CLASS => 'ActiveResource\\Response',
         self::OPTION_UPDATE_METHOD => 'put',
         self::OPTION_UPDATE_DIFF => false,
         self::OPTION_MIDDLEWARE => [],
@@ -201,6 +201,7 @@ class Connection
      */
     public function buildRequest($method, $url, array $queryParams = [], $body = null, array $headers = [])
     {
+        // Normalize method
         $method = strtoupper($method);
 
         // Merge in default headers
@@ -208,19 +209,6 @@ class Connection
 
         // Merge in default query params
         $queryParams = array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS), $queryParams);
-
-        // Apply query parameters to URI
-        if( !empty($queryParams) ) {
-            foreach( $queryParams as &$q ){
-                if( is_array($q) ) {
-                    $q = implode(',', array_values($q));
-                }
-            }
-
-            if( ($query = http_build_query($queryParams, null, '&', PHP_QUERY_RFC1738)) ){
-                $url .= "?{$query}";
-            }
-        }
 
         // Process the body
         if( $body ){
@@ -240,7 +228,7 @@ class Connection
         // Prepend base URI
         $url = $this->getOption(self::OPTION_BASE_URI) . $url;
 
-        return new Request($method, $url, $headers, $body);
+        return new Request($method, $url, $queryParams, $headers, $body);
     }
 
     /**
@@ -256,10 +244,10 @@ class Connection
     }
 
     /**
+     * Make the HTTP call
+     *
      * @param Request $request
-     *
      * @throws ConnectException
-     *
      * @return ResponseAbstract
      */
     protected function call(Request $request)
@@ -278,12 +266,13 @@ class Connection
         $responseClass = $this->getResponseClass();
         $response = new $responseClass($response);
 
-        // If we're logging requests, save the response body and build the log record
+        // Should we log this request?
         if( $this->getOption(self::OPTION_LOG) ){
             $this->log[] = [
                 'request' => [
                     'method' => $request->getMethod(),
-                    'url' => $request->getUrl(),
+                    'url' => $request->getUrl().$request->getQueryAsString(),
+                    'query' => $request->getQueries(),
                     'headers' => $request->getHeaders(),
                     'body' => $request->getBody(),
                 ],

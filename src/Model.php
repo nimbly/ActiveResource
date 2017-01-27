@@ -382,7 +382,7 @@ abstract class Model
      *
      * @return Connection
      */
-    protected function getConnection()
+    public function getConnection()
     {
         return ConnectionManager::get($this->connectionName);
     }
@@ -733,15 +733,17 @@ abstract class Model
     }
 
     /**
-     * Get the named Connection instance
-     *
-     * @param $connectionName
-     *
-     * @throws ActiveResourceException
+     * Get the connection
      *
      * @return Connection
      */
-    public static function connection($connectionName){
-        return ConnectionManager::get($connectionName);
+    public static function connection(){
+
+        $className = get_called_class();
+
+        /** @var self $instance */
+        $instance = new $className;
+
+        return $instance->getConnection();
     }
 }
