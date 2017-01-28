@@ -71,7 +71,7 @@ abstract class Model
         $uri = '';
 
         if( ($dependencies = $this->getDependencies()) ){
-           $uri.=$this->getDependencies();
+           $uri.="{$dependencies}/";
         }
 
         $uri.=$this->getResourceName();
@@ -644,11 +644,15 @@ abstract class Model
         /** @var Model $resource */
         if( $resource instanceof Model )
         {
-            $uri = "{$resource->getResourceUri()}/{$instance->getResourceUri()}/{$id}";
+            $uri = "{$resource->getResourceUri()}/{$instance->getResourceUri()}";
         }
 
         else {
-            $uri = "{$resource}/{$instance->getResourceUri()}/{$id}";
+            $uri = "{$resource}/{$instance->getResourceUri()}";
+        }
+
+        if( $id ){
+            $uri.="/{$id}";
         }
 
         $response = $instance->getConnection()->get($uri, $queryParams, $headers);
