@@ -1,6 +1,6 @@
 {
     "name": "nimbly\/activeresource",
-    "version": "0.4.8",
+    "version": "0.4.9",
     "description": "Use a RESTful resource based API like a database",
     "keywords": [
         "api",
