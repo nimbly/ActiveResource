@@ -176,7 +176,7 @@ for full configuration options, custom `Response` and `Error` classes, and Middl
     $users = Users::all(['status' => 'active']);
 
     // Delete user ID=1
-    $user->delete();
+    $user->destroy();
     
     // Get the response code
     $statusCode = $user->getResponse()->getStatusCode(); // 204 No Content

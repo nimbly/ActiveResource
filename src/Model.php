@@ -626,7 +626,7 @@ abstract class Model
      * $comment = Comment::findThrough($post, 5678);
      *
      * @param Model|string $resource
-     * @param $id
+     * @param integer|string|null $id
      * @param array $queryParams
      * @param array $headers
      *
@@ -634,7 +634,7 @@ abstract class Model
      *
      * @return Model|bool
      */
-    public static function findThrough($resource, $id, array $queryParams = [], array $headers = [])
+    public static function findThrough($resource, $id = null, array $queryParams = [], array $headers = [])
     {
         $className = get_called_class();
 
