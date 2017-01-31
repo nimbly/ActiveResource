@@ -225,6 +225,11 @@ class Connection
             }
         }
 
+        // If we have a falsey body, set body to null
+        if( empty($body) ){
+            $body = null;
+        }
+
         // Prepend base URI
         $url = $this->getOption(self::OPTION_BASE_URI) . $url;
 
