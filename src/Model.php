@@ -557,7 +557,7 @@ abstract class Model
                 $data = $response->getPayload();
             }
 
-            return new Collection($className, $data);
+            return new Collection($className, $data, $response);
         }
 
         if( $response->isThrowable() ) {
@@ -592,15 +592,7 @@ abstract class Model
         $response = $instance->getConnection()->delete($instance->getResourceUri(), $queryParams, $headers);
 
         if( $response->isSuccessful() ) {
-            $instance->response = $response;
-            if( method_exists($instance, 'parseAll') ){
-                $data = $instance->parseAll($response->getPayload());
-            }
-            else {
-                $data = $response->getPayload();
-            }
-
-            return $instance->hydrate($data);
+            return true;
         }
 
         if( $response->isThrowable() ) {
@@ -723,7 +715,7 @@ abstract class Model
                 $data = $response->getPayload();
             }
 
-            return new Collection($className, $data);
+            return new Collection($className, $data, $response);
         }
 
         if( $response->isThrowable() ) {
