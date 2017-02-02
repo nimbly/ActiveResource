@@ -62,6 +62,16 @@ abstract class Model
     }
 
     /**
+     * Get the identifier property name (defaults to "id")
+     *
+     * @return string
+     */
+    public function getIdentifierName()
+    {
+        return $this->identifierName;
+    }
+
+    /**
      * Get the full resource URI
      *
      * @return string
@@ -96,7 +106,7 @@ abstract class Model
     /**
      * Get the error object
      *
-     * @return ErrorAbstract
+     * @return ErrorAbstract|null
      */
     public function getError()
     {
@@ -123,10 +133,6 @@ abstract class Model
 
         // Existing resource, update (PUT/PATCH) resource instance
         else {
-            // if there's nothing to update, don't send the request
-            if( $this->isDirty() == false ){
-                return true;
-            }
 
             // Can we just send the dirty fields?
             if( $this->getConnection()->getOption(Connection::OPTION_UPDATE_DIFF) ){
@@ -270,20 +276,6 @@ abstract class Model
         }
     }
 
-    /**
-     * Get the original value of a property
-     *
-     * @param $property
-     * @return mixed|null
-     */
-    public function original($property)
-    {
-        if( array_key_exists($property, $this->attributes) ){
-            return $this->attributes[$property];
-        }
-
-        return null;
-    }
 
     /**
      * Magic getter
@@ -317,6 +309,32 @@ abstract class Model
         }
 
         $this->dirty[$property] = $value;
+    }
+
+    /**
+     * Get the original value of a property (before it was modified).
+     *
+     *
+     * @param $property
+     * @return mixed|null
+     */
+    public function original($property)
+    {
+        if( array_key_exists($property, $this->attributes) ){
+            return $this->attributes[$property];
+        }
+
+        return null;
+    }
+
+    /**
+     * Reset all modified properties, reset response, reset error
+     *
+     * @return void
+     */
+    public function reset()
+    {
+        $this->dirty = [];
     }
 
     /**
@@ -463,7 +481,7 @@ abstract class Model
                     $this->resourceIdentifier = $value;
                 }
 
-                // is there some sort of filter on this property?
+                // is there some sort of filter method on this property?
                 if( method_exists($this, $key) ){
                     $this->attributes[$key] = $this->{$key}($value);
                 }
@@ -500,14 +518,9 @@ abstract class Model
 
         /** @var self $instance */
         $instance = new $className;
+        $instance->{$instance->getIdentifierName()} = $id;
 
-        $uri = $instance->getResourceUri();
-
-        if( $id ){
-            $uri.="/{$id}";
-        }
-
-        $response = $instance->getConnection()->get($uri, $queryParams, $headers);
+        $response = $instance->getConnection()->get($instance->getResourceUri(), $queryParams, $headers);
 
         if( $response->isSuccessful() ) {
             $instance->response = $response;
@@ -518,9 +531,7 @@ abstract class Model
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response);
-
-            throw new ActiveResourceResponseException($error);
+            throw new ActiveResourceResponseException(new $errorClass($response));
         }
 
         return false;
@@ -549,22 +560,13 @@ abstract class Model
         $response = $instance->getConnection()->get($instance->getResourceName(), $queryParams, $headers);
 
         if( $response->isSuccessful() ) {
-            $instance->response = $response;
-            if( method_exists($instance, 'parseAll') ){
-                $data = $instance->parseAll($response->getPayload());
-            }
-            else {
-                $data = $response->getPayload();
-            }
-
+            $data = $instance->parseAll($response->getPayload());
             return new Collection($className, $data, $response);
         }
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response);
-
-            throw new ActiveResourceResponseException($error);
+            throw new ActiveResourceResponseException(new $errorClass($response));
         }
 
         return false;
@@ -587,7 +589,7 @@ abstract class Model
 
         /** @var self $instance */
         $instance = new $className;
-        $instance->id = $id;
+        $instance->{$instance->getIdentifierName()} = $id;
 
         $response = $instance->getConnection()->delete($instance->getResourceUri(), $queryParams, $headers);
 
@@ -597,9 +599,7 @@ abstract class Model
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response);
-
-            throw new ActiveResourceResponseException($error);
+            throw new ActiveResourceResponseException(new $errorClass($response));
         }
 
         return false;
@@ -632,22 +632,10 @@ abstract class Model
 
         /** @var self $instance */
         $instance = new $className;
+        $instance->{$instance->getIdentifierName()} = $id;
+        $instance->through($resource);
 
-        /** @var Model $resource */
-        if( $resource instanceof Model )
-        {
-            $uri = "{$resource->getResourceUri()}/{$instance->getResourceUri()}";
-        }
-
-        else {
-            $uri = "{$resource}/{$instance->getResourceUri()}";
-        }
-
-        if( $id ){
-            $uri.="/{$id}";
-        }
-
-        $response = $instance->getConnection()->get($uri, $queryParams, $headers);
+        $response = $instance->getConnection()->get($instance->getResourceUri(), $queryParams, $headers);
 
         if( $response->isSuccessful() ) {
             $instance->response = $response;
@@ -658,9 +646,7 @@ abstract class Model
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response);
-
-            throw new ActiveResourceResponseException($error);
+            throw new ActiveResourceResponseException(new $errorClass($response));
         }
 
         return false;
@@ -693,36 +679,18 @@ abstract class Model
 
         /** @var self $instance */
         $instance = new $className;
+        $instance->through($resource);
 
-        /** @var Model $resource */
-        if( $resource instanceof Model )
-        {
-            $uri = "{$resource->getResourceUri()}/{$instance->getResourceUri()}";
-        }
-
-        else {
-            $uri = "{$resource}/{$instance->getResourceUri()}";
-        }
-
-        $response = $instance->getConnection()->get($uri, $queryParams, $headers);
+        $response = $instance->getConnection()->get($instance->getResourceUri(), $queryParams, $headers);
 
         if( $response->isSuccessful() ) {
-            $instance->response = $response;
-            if( method_exists($instance, 'parseAll') ){
-                $data = $instance->parseAll($response->getPayload());
-            }
-            else {
-                $data = $response->getPayload();
-            }
-
+            $data = $instance->parseAll($response->getPayload());
             return new Collection($className, $data, $response);
         }
 
         if( $response->isThrowable() ) {
             $errorClass = $instance->getConnection()->getErrorClass();
-            $error = new $errorClass($response);
-
-            throw new ActiveResourceResponseException($error);
+            throw new ActiveResourceResponseException(new $errorClass($response));
         }
 
         return false;

@@ -31,6 +31,7 @@
     ],
     "require": {
         "php": "^5.3.3 || ^7.0",
-        "guzzlehttp\/guzzle": "^6.2"
+        "guzzlehttp\/guzzle": "^6.2",
+        "optimus/onion": "^1.0"
     }
 }

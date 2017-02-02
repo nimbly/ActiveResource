@@ -26,7 +26,16 @@ class Request
     /** @var  string */
     protected $body;
 
-    public function __construct($method, $url, $query, $headers, $body)
+    /**
+     * Build an ActiveResource request object
+     *
+     * @param string $method HTTP method (GET, POST, PUT, PATCH, DELETE, HEAD)
+     * @param string $url Fully qualified URL (https://some.api.com/v1/posts/456)
+     * @param array $query Associative array of query params to add to URL
+     * @param array $headers Associative array of headers to add to request
+     * @param string $body Request body
+     */
+    public function __construct($method = null, $url = null, $query = [], $headers = [], $body = null)
     {
         $this->method = $method;
         $this->url = $url;
@@ -37,6 +46,7 @@ class Request
 
     /**
      * Get HTTP method for request
+     *
      * @return string
      */
     public function getMethod()
@@ -124,7 +134,7 @@ class Request
     }
 
     /**
-     * Return query as HTTP query string
+     * Return query as HTTP query string (RFC1738)
      *
      * @return null|string
      */
@@ -229,7 +239,7 @@ class Request
 
 
     /**
-     * Build a Psr7\Request instance from this request
+     * Build a PSR-7 Request instance
      *
      * @return \GuzzleHttp\Psr7\Request
      */

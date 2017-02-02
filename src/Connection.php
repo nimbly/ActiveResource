@@ -13,6 +13,7 @@ use ActiveResource\Request;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\ConnectException;
+use Optimus\Onion\Onion;
 use Psr\Http\Message\ResponseInterface;
 
 class Connection
@@ -20,8 +21,8 @@ class Connection
     /** @var Client */
     protected $httpClient = null;
 
-    /** @var array  */
-    protected $middlewareInstances = [];
+    /** @var  Onion */
+    protected $middlewareManager;
 
     /** @var array  */
     protected $log = [];
@@ -129,6 +130,7 @@ class Connection
      */
     public $request;
 
+
     /**
      * Connection constructor.
      * @param Client $httpClient
@@ -142,11 +144,19 @@ class Connection
             }
         }
 
-        if( empty($httpClient) ){
-            $httpClient = new Client;
+        if( !empty($httpClient) ){
+            $this->setHttpClient($httpClient);
         }
+    }
 
-        $this->setHttpClient($httpClient);
+    /**
+     * Set the HTTP client for this connection
+     *
+     * @param Client $httpClient
+     */
+    public function setHttpClient(Client $httpClient)
+    {
+        $this->httpClient = $httpClient;
     }
 
     /**
@@ -182,16 +192,40 @@ class Connection
     }
 
     /**
-     * Set the HTTP client for this connection
-     *
-     * @param Client $httpClient
+     * @return string
      */
-    public function setHttpClient(Client $httpClient)
+    public function getResponseClass()
     {
-        $this->httpClient = $httpClient;
+        return $this->getOption(self::OPTION_RESPONSE_CLASS);
     }
 
     /**
+     * @return string
+     */
+    public function getErrorClass()
+    {
+        return $this->getOption(self::OPTION_ERROR_CLASS);
+    }
+
+    /**
+     * @return string
+     */
+    public function getUpdateMethod()
+    {
+        $method = $this->getOption(self::OPTION_UPDATE_METHOD);
+
+        if( empty($method) ){
+            return 'put';
+        }
+
+        return strtolower($method);
+    }
+
+    /**
+     * Build an ActiveResource Request object.
+     *
+     * This Request object will be passed through the middleware layers.
+     *
      * @param string $method
      * @param string $url
      * @param array $queryParams
@@ -237,15 +271,20 @@ class Connection
     }
 
     /**
-     * Send a request
+     * Send a request.
+     *
+     * Converts request to a PSR7 request to send to Guzzle.
      *
      * @param Request $request
      * @return mixed|ResponseInterface
      */
     public function send(Request $request)
     {
-        $response = $this->httpClient->send($request->newPsr7Request());
-        return $response;
+        if( empty($this->httpClient) ){
+            $this->setHttpClient(new Client);
+        }
+
+        return $this->httpClient->send($request->newPsr7Request());
     }
 
     /**
@@ -257,38 +296,32 @@ class Connection
      */
     protected function call(Request $request)
     {
+        // Initialize middleware manager
+        $this->initializeMiddlewareManager();
+
+        // Get the response class name to instantiate (to pass into Middleware)
+        $responseClass = $this->getResponseClass();
+
+        // Run the request
         $start = microtime(true);
 
-        try {
-            $response = $this->send($request);
-        } catch( BadResponseException $badResponseException ){
-            $response = $badResponseException->getResponse();
-        }
-
-        $stop = microtime(true);
-
         /** @var ResponseAbstract $response */
-        $responseClass = $this->getResponseClass();
-        $response = new $responseClass($response);
+        $response = $this->middlewareManager->peel($request, function($request) use ($responseClass) {
+
+            try {
+                $response = $this->send($request);
+            } catch( BadResponseException $badResponseException ){
+                $response = $badResponseException->getResponse();
+            }
+
+            return new $responseClass($response);
+
+        });
+        $stop = microtime(true);
 
         // Should we log this request?
         if( $this->getOption(self::OPTION_LOG) ){
-            $this->log[] = [
-                'request' => [
-                    'method' => $request->getMethod(),
-                    'url' => $request->getUrl().$request->getQueryAsString(),
-                    'query' => $request->getQueries(),
-                    'headers' => $request->getHeaders(),
-                    'body' => $request->getBody(),
-                ],
-                'response' => [
-                    'status' => $response->getStatusCode(),
-                    'phrase' => $response->getStatusPhrase(),
-                    'headers' => $response->getHeaders(),
-                    'body' => $response->getBody(),
-                ],
-                'time' => $stop - $start,
-            ];
+            $this->addLog($request, $response, ($stop-$start));
         }
 
         return $response;
@@ -306,7 +339,6 @@ class Connection
     public function get($url, array $queryParams = [], array $headers = [])
     {
         $this->request = $this->buildRequest('GET', $url, $queryParams, null, $headers);
-        $this->runMiddleware();
         return $this->call($this->request);
     }
 
@@ -323,7 +355,6 @@ class Connection
     public function post($url, array $queryParams = [], $body = null, array $headers = [])
     {
         $this->request = $this->buildRequest('POST', $url, $queryParams, $body, $headers);
-        $this->runMiddleware();
         return $this->call($this->request);
     }
 
@@ -340,7 +371,6 @@ class Connection
     public function put($url, array $queryParams = [], $body = null, array $headers = [])
     {
         $this->request = $this->buildRequest('PUT', $url, $queryParams, $body, $headers);
-        $this->runMiddleware();
         return $this->call($this->request);
     }
 
@@ -357,7 +387,6 @@ class Connection
     public function patch($url, array $queryParams = [], $body = null, array $headers = [])
     {
         $this->request = $this->buildRequest('PATCH', $url, $queryParams, $body, $headers);
-        $this->runMiddleware();
         return $this->call($this->request);
     }
 
@@ -373,7 +402,6 @@ class Connection
     public function delete($url, array $queryParams = [], array $headers = [])
     {
         $this->request = $this->buildRequest('DELETE', $url, $queryParams, null, $headers);
-        $this->runMiddleware();
         return $this->call($this->request);
     }
 
@@ -389,39 +417,9 @@ class Connection
     public function head($url, array $queryParams = [], array $headers = [])
     {
         $this->request = $this->buildRequest('HEAD', $url, $queryParams, null, $headers);
-        $this->runMiddleware();
         return $this->call($this->request);
     }
 
-    /**
-     * @return string
-     */
-    public function getResponseClass()
-    {
-        return $this->getOption(self::OPTION_RESPONSE_CLASS);
-    }
-
-    /**
-     * @return string
-     */
-    public function getErrorClass()
-    {
-        return $this->getOption(self::OPTION_ERROR_CLASS);
-    }
-
-    /**
-     * @return string
-     */
-    public function getUpdateMethod()
-    {
-        $method = $this->getOption(self::OPTION_UPDATE_METHOD);
-
-        if( empty($method) ){
-            return 'put';
-        }
-
-        return strtolower($method);
-    }
 
     /**
      * @return array
@@ -432,29 +430,47 @@ class Connection
     }
 
     /**
-     * Loop through list of middleware and run each one
+     * @param Request $request
+     * @param ResponseAbstract $response
+     * @param float $timing
      */
-    protected function runMiddleware()
+    private function addLog(Request $request, ResponseAbstract $response, $timing)
     {
-        foreach( $this->getOption(self::OPTION_MIDDLEWARE) as $middleware )
-        {
-            $instance = $this->getMiddlewareInstance($middleware);
-            $instance->run($this);
-        }
+        $this->log[] = [
+            'request' => [
+                'method' => $request->getMethod(),
+                'url' => $request->getUrl().$request->getQueryAsString(),
+                'query' => $request->getQueries(),
+                'headers' => $request->getHeaders(),
+                'body' => $request->getBody(),
+            ],
+            'response' => [
+                'status' => $response->getStatusCode(),
+                'phrase' => $response->getStatusPhrase(),
+                'headers' => $response->getHeaders(),
+                'body' => $response->getBody(),
+            ],
+            'time' => $timing,
+        ];
     }
 
     /**
-     * @param $middleware
-     * @return mixed
+     * Initialize middleware manager by instantiating all middlware classes
+     * and creating Onion instance.
+     *
+     * @return void
      */
-    protected function getMiddlewareInstance($middleware)
+    private function initializeMiddlewareManager()
     {
-        if( isset($this->middlewareInstances[$middleware]) ){
-            return $this->middlewareInstances[$middleware];
-        }
+        if( empty($this->middlewareManager) ){
 
-        $instance = new $middleware;
-        $this->middlewareInstances[$middleware] = $instance;
-        return $instance;
+            $layers = [];
+            foreach( $this->getOption(self::OPTION_MIDDLEWARE) as $middleware ){
+                $layers[] = new $middleware;
+            }
+
+            // Create new Onion
+            $this->middlewareManager = new Onion($layers);
+        }
     }
 }
