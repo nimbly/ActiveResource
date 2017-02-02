@@ -225,8 +225,7 @@ is ActiveResource's default Response class. SeeResponse section for more info.
 
 `updateDiff` *boolean* Whether ActiveResource can send just the modified fields of the resource on an update.
 
-`middleware` *array* An array of middleware classes to run before sending each request. See Middleware section for more
-info.
+`middleware` *array* An array of middleware classes to execute. See Middleware section for more info.
 
 `log` *boolean* Tell ActiveResource to log all requests and responses. Defaults to `false`. Do not use this option
 in production environments. You can access the log via the Connection getLog() method via the ConnectionManager.
@@ -554,19 +553,44 @@ ActiveResource will automatically hydrate model instances for comments and autho
 
 ## Middleware
 
-You can modify and interact with the `Connection` object before it sends its request by using middleware.
-A middleware class must implement a public `run` method and accepts the `Connection` instance
-as its only parameter.
+Middleware in ActiveResource is managed by the excellent [Onion](https://github.com/esbenp/onion) package - "a standalone middleware library without dependencies".
+
+Your middleware classes must implement Onion's LayerInterface class and implement the `peel` method.
+
+The input object is an `ActiveResource\Request` instance. The output is an instance of `ActiveResource\ResponseAbstract`.
 
 ###### Example
     
-    class Authorize
+    class Authorize implements LayerInterface
     {
-        public function run(\ActiveResource\Connection $connection)
+        /**
+        *
+        *  @param \ActiveResource\Request $object
+        */
+        public function peel($object, \Closure $next)
         {
-            if( $connection->request->getMethod() == 'patch' ){
-                $connection->request->setHeader('X-Foo-Header', 'Bar');
-            }
+            // Add a query param to the URL (&foo=bar)
+            $object->setQuery('foo', 'bar');
+            
+            // Do some HMAC authorization logic here
+            // ...
+            // ...            
+            
+            // Now add the HMAC headers
+            $object->setHeader('X-Hmac-Timestamp', $timestamp);
+            $object->setHeader('Authorization', "HMAC {$hmac}");
+            
+            // Send the request off to the next layer
+            $response = $next($object);
+            
+            // Now let's slip in a spoofed header into the response object
+            $response->setHeader('X-Spoofed-Response-Header', 'Foo');
+            
+            // How about we completely change the response status code?
+            $response->setStatusCode(500);
+            
+            // Return the response
+            return $response;
         }
     }
     
