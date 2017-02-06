@@ -124,14 +124,6 @@ class Connection
     ];
 
     /**
-     * Current request instance
-     *
-     * @var Request
-     */
-    public $request;
-
-
-    /**
      * Connection constructor.
      * @param Client $httpClient
      * @param array $options
@@ -192,36 +184,6 @@ class Connection
     }
 
     /**
-     * @return string
-     */
-    public function getResponseClass()
-    {
-        return $this->getOption(self::OPTION_RESPONSE_CLASS);
-    }
-
-    /**
-     * @return string
-     */
-    public function getErrorClass()
-    {
-        return $this->getOption(self::OPTION_ERROR_CLASS);
-    }
-
-    /**
-     * @return string
-     */
-    public function getUpdateMethod()
-    {
-        $method = $this->getOption(self::OPTION_UPDATE_METHOD);
-
-        if( empty($method) ){
-            return 'put';
-        }
-
-        return strtolower($method);
-    }
-
-    /**
      * Build an ActiveResource Request object.
      *
      * This Request object will be passed through the middleware layers.
@@ -271,36 +233,24 @@ class Connection
     }
 
     /**
-     * Send a request.
-     *
-     * Converts request to a PSR7 request to send to Guzzle.
-     *
-     * @param Request $request
-     * @return mixed|ResponseInterface
-     */
-    public function send(Request $request)
-    {
-        if( empty($this->httpClient) ){
-            $this->setHttpClient(new Client);
-        }
-
-        return $this->httpClient->send($request->newPsr7Request());
-    }
-
-    /**
      * Make the HTTP call
      *
      * @param Request $request
      * @throws ConnectException
      * @return ResponseAbstract
      */
-    protected function call(Request $request)
+    public function send(Request $request)
     {
         // Initialize middleware manager
         $this->initializeMiddlewareManager();
 
+        // Lazy load the the HttpClient
+        if( empty($this->httpClient) ){
+            $this->setHttpClient(new Client);
+        }
+
         // Get the response class name to instantiate (to pass into Middleware)
-        $responseClass = $this->getResponseClass();
+        $responseClass = $this->getOption(self::OPTION_RESPONSE_CLASS);
 
         // Run the request
         $start = microtime(true);
@@ -309,7 +259,7 @@ class Connection
         $response = $this->middlewareManager->peel($request, function($request) use ($responseClass) {
 
             try {
-                $response = $this->send($request);
+                $response = $this->httpClient->send($request->newPsr7Request());
             } catch( BadResponseException $badResponseException ){
                 $response = $badResponseException->getResponse();
             }
@@ -326,100 +276,6 @@ class Connection
 
         return $response;
     }
-
-    /**
-     * @param $url
-     * @param array $queryParams
-     * @param array $headers
-     *
-     * @throws ConnectException
-     *
-     * @return ResponseAbstract
-     */
-    public function get($url, array $queryParams = [], array $headers = [])
-    {
-        $this->request = $this->buildRequest('GET', $url, $queryParams, null, $headers);
-        return $this->call($this->request);
-    }
-
-    /**
-     * @param $url
-     * @param array $queryParams
-     * @param null $body
-     * @param array $headers
-     *
-     * @throws ConnectException
-     *
-     * @return ResponseAbstract
-     */
-    public function post($url, array $queryParams = [], $body = null, array $headers = [])
-    {
-        $this->request = $this->buildRequest('POST', $url, $queryParams, $body, $headers);
-        return $this->call($this->request);
-    }
-
-    /**
-     * @param $url
-     * @param array $queryParams
-     * @param null $body
-     * @param array $headers
-     *
-     * @throws ConnectException
-     *
-     * @return ResponseAbstract
-     */
-    public function put($url, array $queryParams = [], $body = null, array $headers = [])
-    {
-        $this->request = $this->buildRequest('PUT', $url, $queryParams, $body, $headers);
-        return $this->call($this->request);
-    }
-
-    /**
-     * @param $url
-     * @param array $queryParams
-     * @param null $body
-     * @param array $headers
-     *
-     * @throws ConnectException
-     *
-     * @return ResponseAbstract
-     */
-    public function patch($url, array $queryParams = [], $body = null, array $headers = [])
-    {
-        $this->request = $this->buildRequest('PATCH', $url, $queryParams, $body, $headers);
-        return $this->call($this->request);
-    }
-
-    /**
-     * @param $url
-     * @param array $queryParams
-     * @param array $headers
-     *
-     * @throws ConnectException
-     *
-     * @return ResponseAbstract
-     */
-    public function delete($url, array $queryParams = [], array $headers = [])
-    {
-        $this->request = $this->buildRequest('DELETE', $url, $queryParams, null, $headers);
-        return $this->call($this->request);
-    }
-
-    /**
-     * @param $url
-     * @param array $queryParams
-     * @param array $headers
-     *
-     * @throws ConnectException
-     *
-     * @return ResponseAbstract
-     */
-    public function head($url, array $queryParams = [], array $headers = [])
-    {
-        $this->request = $this->buildRequest('HEAD', $url, $queryParams, null, $headers);
-        return $this->call($this->request);
-    }
-
 
     /**
      * @return array

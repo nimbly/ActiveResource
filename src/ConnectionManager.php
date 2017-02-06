@@ -11,22 +11,25 @@ namespace ActiveResource;
 
 class ConnectionManager
 {
+    /**
+     * @var Connection[]
+     */
     protected static $connections = [];
 
     /**
-     * Add a connection
+     * Add an API connection
      *
-     * @param $name
+     * @param string $name
      * @param Connection $connection
      */
-    public static function add($name, Connection $connection){
-        self::$connections[$name] = $connection;
+    public static function add($name, Connection $connections){
+        self::$connections[$name] = $connections;
     }
 
     /**
-     * Get a connection by its name
+     * Get an API connection by its name
      *
-     * @param $name
+     * @param string $name
      * @throws ActiveResourceException
      * @return Connection
      */

@@ -38,6 +38,9 @@ abstract class Model
     private $dirty = [];
     private $dependentResources = [];
 
+    /** @var Request */
+    private $request = null;
+
     /** @var ResponseAbstract */
     private $response = null;
 
@@ -123,12 +126,12 @@ abstract class Model
      */
     public function save(array $queryParams = [], array $headers = [])
     {
-        $connection = $this->getConnection();
+        // By default, submit all data
         $data = array_merge($this->attributes, $this->dirty);
 
         // No id, new (POST) resource instance
         if( empty($this->resourceIdentifier) ){
-            $this->response = $connection->post($this->getResourceUri(), $queryParams, $data, $headers);
+            $method = 'post';
         }
 
         // Existing resource, update (PUT/PATCH) resource instance
@@ -140,13 +143,14 @@ abstract class Model
             }
 
             // Get the update method (usually either PUT or PATCH)
-            $method = $connection->getUpdateMethod();
-
-            // Do the update
-            $this->response = $connection->{$method}($this->getResourceUri(), $queryParams, $data, $headers);
+            $method = $this->getConnection()->getOption(Connection::OPTION_UPDATE_METHOD);
         }
 
-        // Looks like a good response, re-hydrate object, and reset the dirty fields
+        // Build request object
+        $request = $this->getConnection()->buildRequest($method, $this->getResourceUri(), $queryParams, $data, $headers);
+
+        // Do the update
+        $this->response = $this->getConnection()->send($request);
         if( $this->response->isSuccessful() ){
             $data = $this->parseFind($this->response->getPayload());
             $this->error = null;
@@ -156,8 +160,7 @@ abstract class Model
         }
 
         // Set the error
-        $errorClass = $connection->getErrorClass();
-        $this->error = new $errorClass($this->response);
+        $this->error = $this->buildError($this->response);
 
         if( $this->response->isThrowable() ) {
             throw new ActiveResourceResponseException($this->error);
@@ -176,19 +179,20 @@ abstract class Model
      */
     public function destroy(array $queryParams = [], array $headers = [])
     {
-        $connection = $this->getConnection();
+        // Build request
+        $request = $this->getConnection()->buildRequest('delete', $this->getResourceUri(), $queryParams, null, $headers);
 
-        $this->response = $connection->delete($this->getResourceUri(), $queryParams, $headers);
-
+        // Get response
+        $this->response = $this->getConnection()->send($request);
         if( $this->response->isSuccessful() ){
             $this->error = null;
             return true;
         }
 
         // Set the error
-        $errorClass = $connection->getErrorClass();
-        $this->error = new $errorClass($this->response);
+        $this->error = $this->buildError($this->response);
 
+        // Throw if needed
         if( $this->response->isThrowable() ) {
             throw new ActiveResourceResponseException($this->error);
         }
@@ -396,13 +400,25 @@ abstract class Model
     }
 
     /**
-     * Get the connection for the model
+     * Get the API connection for the model
      *
      * @return Connection
      */
     public function getConnection()
     {
         return ConnectionManager::get($this->connectionName);
+    }
+
+    /**
+     * Return an instance of the called class
+     *
+     * @param null $constrcutorData
+     * @return self
+     */
+    protected static function getCalledClassInstance($constrcutorData = null)
+    {
+        $className = get_called_class();
+        return new $className($constrcutorData);
     }
 
 
@@ -514,14 +530,14 @@ abstract class Model
      */
     public static function find($id = null, array $queryParams = [], array $headers = [])
     {
-        $className = get_called_class();
-
-        /** @var self $instance */
-        $instance = new $className;
+        $instance = self::getCalledClassInstance();
         $instance->{$instance->getIdentifierName()} = $id;
 
-        $response = $instance->getConnection()->get($instance->getResourceUri(), $queryParams, $headers);
+        // Build the request object
+        $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
 
+        // Send the
+        $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
             $instance->response = $response;
             $data = $instance->parseFind($response->getPayload());
@@ -530,8 +546,7 @@ abstract class Model
         }
 
         if( $response->isThrowable() ) {
-            $errorClass = $instance->getConnection()->getErrorClass();
-            throw new ActiveResourceResponseException(new $errorClass($response));
+            throw new ActiveResourceResponseException($instance->buildError($response));
         }
 
         return false;
@@ -552,21 +567,20 @@ abstract class Model
      */
     public static function all(array $queryParams = [], array $headers = [])
     {
-        $className = get_called_class();
+        $instance = self::getCalledClassInstance();
 
-        /** @var self $instance */
-        $instance = new $className;
+        // Build the request
+        $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
 
-        $response = $instance->getConnection()->get($instance->getResourceName(), $queryParams, $headers);
-
+        // Send the request
+        $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
             $data = $instance->parseAll($response->getPayload());
-            return new Collection($className, $data, $response);
+            return new Collection(get_called_class(), $data, $response);
         }
 
         if( $response->isThrowable() ) {
-            $errorClass = $instance->getConnection()->getErrorClass();
-            throw new ActiveResourceResponseException(new $errorClass($response));
+            throw new ActiveResourceResponseException($instance->buildError($response));
         }
 
         return false;
@@ -576,30 +590,28 @@ abstract class Model
      * Delete a resource
      *
      * @param $id
-     * @param array $queryParams
-     * @param array $headers
+     * @param $options
      *
      * @throws ActiveResourceResponseException
      *
      * @return bool
      */
-    public static function delete($id, array $queryParams = [], array $headers = [])
+    public static function delete($id, array $queryParams = [], array $headers)
     {
-        $className = get_called_class();
-
-        /** @var self $instance */
-        $instance = new $className;
+        $instance = self::getCalledClassInstance();
         $instance->{$instance->getIdentifierName()} = $id;
 
-        $response = $instance->getConnection()->delete($instance->getResourceUri(), $queryParams, $headers);
+        // Build request object
+        $request = $instance->getConnection()->buildRequest('delete', $instance->getResourceUri(), $queryParams, null, $headers);
 
+        // Send request
+        $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
             return true;
         }
 
         if( $response->isThrowable() ) {
-            $errorClass = $instance->getConnection()->getErrorClass();
-            throw new ActiveResourceResponseException(new $errorClass($response));
+            throw new ActiveResourceResponseException($instance->buildError($response));
         }
 
         return false;
@@ -618,7 +630,7 @@ abstract class Model
      * $comment = Comment::findThrough($post, 5678);
      *
      * @param Model|string $resource
-     * @param integer|string|null $id
+     * @param string|null $id
      * @param array $queryParams
      * @param array $headers
      *
@@ -628,14 +640,15 @@ abstract class Model
      */
     public static function findThrough($resource, $id = null, array $queryParams = [], array $headers = [])
     {
-        $className = get_called_class();
-
-        /** @var self $instance */
-        $instance = new $className;
+        $instance = self::getCalledClassInstance();
         $instance->{$instance->getIdentifierName()} = $id;
         $instance->through($resource);
 
-        $response = $instance->getConnection()->get($instance->getResourceUri(), $queryParams, $headers);
+        // Build request object
+        $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
+
+        // Do request
+        $response = $instance->getConnection()->send($request);
 
         if( $response->isSuccessful() ) {
             $instance->response = $response;
@@ -645,8 +658,7 @@ abstract class Model
         }
 
         if( $response->isThrowable() ) {
-            $errorClass = $instance->getConnection()->getErrorClass();
-            throw new ActiveResourceResponseException(new $errorClass($response));
+            throw new ActiveResourceResponseException($instance->buildError($response));
         }
 
         return false;
@@ -675,39 +687,62 @@ abstract class Model
      */
     public static function allThrough($resource, array $queryParams = [], array $headers = [])
     {
-        $className = get_called_class();
-
-        /** @var self $instance */
-        $instance = new $className;
+        $instance = self::getCalledClassInstance();
         $instance->through($resource);
 
-        $response = $instance->getConnection()->get($instance->getResourceUri(), $queryParams, $headers);
+        // Build request object
+        $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
 
+        // Do request, get response
+        $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
             $data = $instance->parseAll($response->getPayload());
-            return new Collection($className, $data, $response);
+            return new Collection(get_called_class(), $data, $response);
         }
 
         if( $response->isThrowable() ) {
-            $errorClass = $instance->getConnection()->getErrorClass();
-            throw new ActiveResourceResponseException(new $errorClass($response));
+            throw new ActiveResourceResponseException($instance->buildError($response));
         }
 
         return false;
     }
 
     /**
-     * Get the connection
+     * Build an instance of an Error response object
+     *
+     * @param ResponseAbstract $response
+     * @return ErrorAbstract
+     */
+    protected function buildError(ResponseAbstract $response)
+    {
+        $errorClass = $this->getConnection()->getOption(Connection::OPTION_ERROR_CLASS);
+        return new $errorClass($response);
+    }
+
+    /**
+     * Send a custom request
+     *
+     * @param string $method
+     * @param string $uri
+     * @param array $queryParams
+     * @param array $headers
+     * @param string|array|null $body
+     * @return ResponseAbstract
+     */
+    public static function send($method, $uri, array $queryParams = [], array $headers = [], $body = null)
+    {
+        $instance = self::getCalledClassInstance();
+        $request = $instance->getConnection()->buildRequest($method, $uri, $queryParams, $body, $headers);
+
+        return $instance->getConnection()->send($request);
+    }
+
+    /**
+     * Get the API connection
      *
      * @return Connection
      */
     public static function connection(){
-
-        $className = get_called_class();
-
-        /** @var self $instance */
-        $instance = new $className;
-
-        return $instance->getConnection();
+        return self::getCalledClassInstance()->getConnection();
     }
 }
