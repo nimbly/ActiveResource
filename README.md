@@ -11,7 +11,7 @@ the other a 3rd party.
 
 I hope you will find it as useful as I have.
 
-If you have any suggestions or potential feature requests, feel free to ping me.
+If you have any suggestions or potential feature requests, feel free to ping me [brent@brentscheffler.com](brent@brentscheffler.com)
 
 ## Installation
 
@@ -699,9 +699,11 @@ codes you want. Or make it an empty array to *never* throw an exception.
 Connection issues including timeouts will *always* throw a `GuzzleHttp\Exception\ConnectException`.
 
 ##### The API I am working with has an endpoint that simply does not conform to the ActiveResource pattern, how can I call the endpoint?
-You can interact directly with the `Connection` object's `get`, `post`, `put`, `patch`, and `delete` methods.
+You can send a custom request by getting the `Connection` object instance and using the `buildRequest` and `send`
+methods.
 
     $connection = ConnectionManager::get('yourConnectionName');
-    $response = $connection->get('some/oddball/endpoint', ['status' => 'foo']);
+    $request = $connection->buildRequest('post', '/some/oddball/endpoint', ['param1' => 'value1'], ['foo' => 'bar', 'fox' => 'sox'], ['X-Custom-Header', 'Foo']);
+    $response = $connection->send($request);
     
-You'll get a `Response` object back and will need to manually decode and parse the response yourself.
+You'll get an instance of a `ResponseAbstract` object back.
