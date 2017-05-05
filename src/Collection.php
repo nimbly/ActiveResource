@@ -11,27 +11,63 @@ namespace ActiveResource;
 
 class Collection implements \IteratorAggregate, \Countable, \ArrayAccess
 {
+
+    /** @var  Request */
+    protected $request;
+
     /** @var ResponseAbstract  */
     protected $response;
-    protected $index = 0;
+
+    /** @var Model[] */
     protected $objects = [];
 
-    public function __construct($className, array $data = [], ResponseAbstract $response = null)
+    /** @var int  */
+    protected $index = 0;
+
+    /**
+     * Collection constructor.
+     * @param string $className
+     * @param array $data
+     * @param Request|null $request
+     * @param ResponseAbstract|null $response
+     */
+    public function __construct($className, array $data = [], Request $request = null, ResponseAbstract $response = null)
     {
-        foreach( $data as $object )
+        foreach($data as $object)
         {
-            $this->objects[] = new $className($object);
+            $this->objects[] = new $className($object, true);
         }
 
+        $this->request = $request;
         $this->response = $response;
     }
 
     /**
+     * Get the Request object from the last API call
+     *
+     * @return Request
+     */
+    public function getRequest()
+    {
+        return $this->request;
+    }
+
+    /**
+     * Get the Response object from the last API call
+     *
      * @return ResponseAbstract
      */
     public function getResponse()
     {
         return $this->response;
+    }
+
+    /**
+     * @param ResponseAbstract $response
+     */
+    public function setResponse(ResponseAbstract $response)
+    {
+        $this->response = $response;
     }
 
     public function getIterator()

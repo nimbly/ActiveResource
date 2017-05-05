@@ -12,7 +12,7 @@ namespace ActiveResource;
 abstract class Model
 {
     /**
-     * The unique key field for the resource
+     * The unique/primary key field for the resource
      *
      * @var string $identifierName
      */
@@ -32,25 +32,78 @@ abstract class Model
      */
     protected $connectionName = 'default';
 
+    /**
+     * Array of property names that are read only. I.e. when setting named property, it will not modify.
+     *
+     * When set to null or empty array, all properties are writeable.
+     *
+     * @var null|array
+     */
+    protected $readOnlyProperties = null;
 
+    /**
+     * When set to array of property names, only these properties are allowed to be mass assigned when calling the fill() method.
+     *
+     * If null, *all* properties will be mass assigned.
+     *
+     * @var null|array
+     */
+    protected $fillableProperties = null;
+
+    /**
+     * Array of property names that are excluded when saving/updating model to API.
+     *
+     * If null or empty array, all properties will be sent when saving model.
+     *
+     * @var null|array
+     */
+    protected $excludedProperties = null;
+
+    /** @var string|integer|null $resourceIdentifier */
     private $resourceIdentifier = null;
-    private $attributes = [];
-    private $dirty = [];
+
+    /** @var array $properties */
+    private $properties = [];
+
+    /** @var array $modifiedProperties */
+    private $modifiedProperties = [];
+
+    /** @var array $dependentResources */
     private $dependentResources = [];
 
     /** @var Request */
-    private $request = null;
+    protected $request;
 
     /** @var ResponseAbstract */
-    private $response = null;
+    protected $response;
 
     /** @var ErrorAbstract */
     private $error = null;
 
-    public function __construct($data = null)
+    /**
+     * Model constructor.
+     * @param array|object|null $data
+     * @param bool $setResourceIdentifier
+     */
+    public function __construct($data = null, $setResourceIdentifier = false)
     {
+        if( $this->fillableProperties !== null &&
+            !is_array($this->fillableProperties) ){
+            throw new ActiveResourceException('Invalid fillableProperties on model');
+        }
+
+        if( $this->excludedProperties !== null &&
+            !is_array($this->excludedProperties) ){
+            throw new ActiveResourceException('Invalid excludedProperties on model');
+        }
+
+        if( $this->readOnlyProperties !== null &&
+            !is_array($this->readOnlyProperties) ){
+            throw new ActiveResourceException('Invalid readOnlyProperties on model');
+        }
+
         if( !empty($data) ){
-            $this->hydrate($data);
+            $this->hydrate($data, $setResourceIdentifier);
         }
     }
 
@@ -97,9 +150,19 @@ abstract class Model
     }
 
     /**
-     * Get the Response object
+     * Get the Request object from the last API call
      *
-     * @return ResponseAbstract|null
+     * @return Request
+     */
+    public function getRequest()
+    {
+        return $this->request;
+    }
+
+    /**
+     * Get the Response object from the last API call
+     *
+     * @return ResponseAbstract
      */
     public function getResponse()
     {
@@ -127,7 +190,7 @@ abstract class Model
     public function save(array $queryParams = [], array $headers = [])
     {
         // By default, submit all data
-        $data = array_merge($this->attributes, $this->dirty);
+        $data = array_merge($this->properties, $this->modifiedProperties);
 
         // No id, new (POST) resource instance
         if( empty($this->resourceIdentifier) ){
@@ -137,25 +200,29 @@ abstract class Model
         // Existing resource, update (PUT/PATCH) resource instance
         else {
 
-            // Can we just send the dirty fields?
+            // Can we just send the modified fields?
             if( $this->getConnection()->getOption(Connection::OPTION_UPDATE_DIFF) ){
-                $data = $this->dirty;
+                $data = $this->modifiedProperties;
             }
 
             // Get the update method (usually either PUT or PATCH)
             $method = $this->getConnection()->getOption(Connection::OPTION_UPDATE_METHOD);
         }
 
+        // Filter out excluded properties
+        if( is_array($this->excludedProperties) ){
+            $data = array_diff($data, $this->excludedProperties);
+        }
+
         // Build request object
-        $request = $this->getConnection()->buildRequest($method, $this->getResourceUri(), $queryParams, $data, $headers);
+        $this->request = $this->getConnection()->buildRequest($method, $this->getResourceUri(), $queryParams, $data, $headers);
 
         // Do the update
-        $this->response = $this->getConnection()->send($request);
+        $this->response = $this->getConnection()->send($this->request);
         if( $this->response->isSuccessful() ){
-            $data = $this->parseFind($this->response->getPayload());
+            $this->hydrate($this->parseFind($this->response->getPayload()));
             $this->error = null;
-            $this->hydrate($data);
-            $this->dirty = [];
+            $this->modifiedProperties = [];
             return true;
         }
 
@@ -180,10 +247,10 @@ abstract class Model
     public function destroy(array $queryParams = [], array $headers = [])
     {
         // Build request
-        $request = $this->getConnection()->buildRequest('delete', $this->getResourceUri(), $queryParams, null, $headers);
+        $this->request = $this->getConnection()->buildRequest('delete', $this->getResourceUri(), $queryParams, null, $headers);
 
         // Get response
-        $this->response = $this->getConnection()->send($request);
+        $this->response = $this->getConnection()->send($this->request);
         if( $this->response->isSuccessful() ){
             $this->error = null;
             return true;
@@ -208,8 +275,13 @@ abstract class Model
      */
     public function fill(array $data)
     {
-        foreach( $data as $key => $value ){
-            $this->{$key} = $value;
+        foreach( $data as $property => $value ){
+            if( is_array($this->fillableProperties) &&
+                !in_array($property, $this->fillableProperties) ){
+                continue;
+            }
+
+            $this->{$property} = $value;
         }
     }
 
@@ -244,7 +316,10 @@ abstract class Model
             return $data;
         }
 
-        return new $model($data);
+        /** @var self $instance */
+        $instance = new $model;
+        $instance->hydrate($data);
+        return $instance;
     }
 
     /**
@@ -289,12 +364,12 @@ abstract class Model
      */
     public function __get($property)
     {
-        if( array_key_exists($property, $this->dirty) ){
-            return $this->dirty[$property];
+        if( array_key_exists($property, $this->modifiedProperties) ){
+            return $this->modifiedProperties[$property];
         }
 
-        elseif( array_key_exists($property, $this->attributes) ){
-            return $this->attributes[$property];
+        elseif( array_key_exists($property, $this->properties) ){
+            return $this->properties[$property];
         }
 
         return null;
@@ -308,11 +383,13 @@ abstract class Model
      */
     public function __set($property, $value)
     {
-        if( $property == $this->identifierName ){
-            $this->resourceIdentifier = $value;
+        // Is this a read only property?
+        if( is_array($this->readOnlyProperties) &&
+            in_array($property, $this->readOnlyProperties) ){
+            return;
         }
 
-        $this->dirty[$property] = $value;
+        $this->modifiedProperties[$property] = $value;
     }
 
     /**
@@ -324,21 +401,21 @@ abstract class Model
      */
     public function original($property)
     {
-        if( array_key_exists($property, $this->attributes) ){
-            return $this->attributes[$property];
+        if( in_array($property, $this->properties) ){
+            return $this->properties[$property];
         }
 
         return null;
     }
 
     /**
-     * Reset all modified properties, reset response, reset error
+     * Reset all modified properties
      *
      * @return void
      */
     public function reset()
     {
-        $this->dirty = [];
+        $this->modifiedProperties = [];
     }
 
     /**
@@ -346,24 +423,24 @@ abstract class Model
      */
     public function toArray()
     {
-        $attributes = array_merge($this->attributes, $this->dirty);
+        $properties = array_merge($this->properties, $this->modifiedProperties);
 
-        foreach( $attributes as $property => $value )
+        foreach( $properties as $property => $value )
         {
             if( $value instanceof Model )
             {
-                $attributes[$property] = $value->toArray();
+                $properties[$property] = $value->toArray();
             }
             elseif( $value instanceof \StdClass )
             {
-                $attributes[$property] = (array)$value;
+                $properties[$property] = (array)$value;
             }
             else{
-                $attributes[$property] = $value;
+                $properties[$property] = $value;
             }
         }
 
-        return $attributes;
+        return $properties;
     }
 
     /**
@@ -375,7 +452,7 @@ abstract class Model
     }
 
     /**
-     * Get the model's resource name (defaults to class name)
+     * Get the model's resource name (defaults to lowercase class name)
      *
      * @return null|string
      */
@@ -412,24 +489,23 @@ abstract class Model
     /**
      * Return an instance of the called class
      *
-     * @param null $constrcutorData
+     * @param null $constructorData
      * @return self
      */
-    protected static function getCalledClassInstance($constrcutorData = null)
+    protected static function getCalledClassInstance($constructorData = null)
     {
         $className = get_called_class();
-        return new $className($constrcutorData);
+        return new $className($constructorData);
     }
 
-
     /**
-     * Is this entity dirty?
+     * Is this entity modified?
      *
      * @return int
      */
-    protected function isDirty()
+    protected function isModified()
     {
-        return count($this->dirty);
+        return count($this->modifiedProperties);
     }
 
     /**
@@ -469,17 +545,17 @@ abstract class Model
     }
 
     /**
-     * Hydrate
+     * Hydrate model instance
      *
-     * @param $data
+     * @param array|object $data
+     * @param bool $setResourceIdentifier
      *
      * @throws ActiveResourceException
      *
      * @return boolean
      */
-    protected function hydrate($data)
+    protected function hydrate($data, $setResourceIdentifier = true)
     {
-
         if( empty($data) ){
             return true;
         }
@@ -491,26 +567,37 @@ abstract class Model
 
         // Process the data payload object
         if( is_object($data) ){
-            foreach( get_object_vars($data) as $key => $value ){
-
-                if( $key == $this->identifierName ){
-                    $this->resourceIdentifier = $value;
-                }
+            foreach( get_object_vars($data) as $property => $value ){
 
                 // is there some sort of filter method on this property?
-                if( method_exists($this, $key) ){
-                    $this->attributes[$key] = $this->{$key}($value);
+                if( method_exists($this, $property) ){
+                    $value = $this->{$property}($value);
                 }
 
-                else {
-                    $this->attributes[$key] = $value;
-                }
+                $this->properties[$property] = $value;
+            }
+
+            if( $setResourceIdentifier ){
+                $this->resourceIdentifier = $this->{$this->identifierName};
             }
 
             return true;
         }
 
-        throw new ActiveResourceException('Failed to hydrate. Invalid payload data format.');
+        throw new ActiveResourceException('Failed to hydrate - invalid data format.');
+    }
+
+    /**
+     * Manually set the resource identifier on the model instance.
+     *
+     * This property is used to inform the model whether the object was retrieved via the API vs a manually hydrated
+     * object instance.
+     *
+     * @param $value
+     */
+    public function setResourceIdentifier($value)
+    {
+        $this->resourceIdentifier = $value;
     }
 
 
@@ -531,17 +618,17 @@ abstract class Model
     public static function find($id = null, array $queryParams = [], array $headers = [])
     {
         $instance = self::getCalledClassInstance();
-        $instance->{$instance->getIdentifierName()} = $id;
+        $instance->setResourceIdentifier($id);
 
         // Build the request object
         $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
 
-        // Send the
+        // Send the request
         $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
+            $instance->request = $request;
             $instance->response = $response;
-            $data = $instance->parseFind($response->getPayload());
-            $instance->hydrate($data);
+            $instance->hydrate($instance->parseFind($response->getPayload()));
             return $instance;
         }
 
@@ -576,7 +663,7 @@ abstract class Model
         $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
             $data = $instance->parseAll($response->getPayload());
-            return new Collection(get_called_class(), $data, $response);
+            return new Collection(get_called_class(), $data, $request, $response);
         }
 
         if( $response->isThrowable() ) {
@@ -590,7 +677,8 @@ abstract class Model
      * Delete a resource
      *
      * @param $id
-     * @param $options
+     * @param array $queryParams
+     * @param array $headers
      *
      * @throws ActiveResourceResponseException
      *
@@ -599,7 +687,7 @@ abstract class Model
     public static function delete($id, array $queryParams = [], array $headers)
     {
         $instance = self::getCalledClassInstance();
-        $instance->{$instance->getIdentifierName()} = $id;
+        $instance->setResourceIdentifier($id);
 
         // Build request object
         $request = $instance->getConnection()->buildRequest('delete', $instance->getResourceUri(), $queryParams, null, $headers);
@@ -641,7 +729,7 @@ abstract class Model
     public static function findThrough($resource, $id = null, array $queryParams = [], array $headers = [])
     {
         $instance = self::getCalledClassInstance();
-        $instance->{$instance->getIdentifierName()} = $id;
+        $instance->setResourceIdentifier($id);
         $instance->through($resource);
 
         // Build request object
@@ -651,9 +739,9 @@ abstract class Model
         $response = $instance->getConnection()->send($request);
 
         if( $response->isSuccessful() ) {
+            $instance->hydrate($instance->parseFind($response->getPayload()));
+            $instance->request = $request;
             $instance->response = $response;
-            $data = $instance->parseFind($response->getPayload());
-            $instance->hydrate($data);
             return $instance;
         }
 
@@ -697,7 +785,7 @@ abstract class Model
         $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
             $data = $instance->parseAll($response->getPayload());
-            return new Collection(get_called_class(), $data, $response);
+            return new Collection(get_called_class(), $data, $request, $response);
         }
 
         if( $response->isThrowable() ) {
@@ -717,24 +805,6 @@ abstract class Model
     {
         $errorClass = $this->getConnection()->getOption(Connection::OPTION_ERROR_CLASS);
         return new $errorClass($response);
-    }
-
-    /**
-     * Send a custom request
-     *
-     * @param string $method
-     * @param string $uri
-     * @param array $queryParams
-     * @param array $headers
-     * @param string|array|null $body
-     * @return ResponseAbstract
-     */
-    public static function send($method, $uri, array $queryParams = [], array $headers = [], $body = null)
-    {
-        $instance = self::getCalledClassInstance();
-        $request = $instance->getConnection()->buildRequest($method, $uri, $queryParams, $body, $headers);
-
-        return $instance->getConnection()->send($request);
     }
 
     /**

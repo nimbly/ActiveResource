@@ -22,8 +22,8 @@ class ConnectionManager
      * @param string $name
      * @param Connection $connection
      */
-    public static function add($name, Connection $connections){
-        self::$connections[$name] = $connections;
+    public static function add($name, Connection $connection){
+        self::$connections[$name] = $connection;
     }
 
     /**

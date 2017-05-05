@@ -184,7 +184,7 @@ class Connection
     }
 
     /**
-     * Build an ActiveResource Request object.
+     * Build an ActiveResource Request object instance using the connection's options.
      *
      * This Request object will be passed through the middleware layers.
      *
@@ -200,8 +200,8 @@ class Connection
         // Normalize method
         $method = strtoupper($method);
 
-        // Merge in default headers
-        $headers = array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS), $headers);
+        // Prepend base URI
+        $url = $this->getOption(self::OPTION_BASE_URI) . $url;
 
         // Merge in default query params
         $queryParams = array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS), $queryParams);
@@ -226,8 +226,8 @@ class Connection
             $body = null;
         }
 
-        // Prepend base URI
-        $url = $this->getOption(self::OPTION_BASE_URI) . $url;
+        // Merge in default headers
+        $headers = array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS), $headers);
 
         return new Request($method, $url, $queryParams, $headers, $body);
     }
@@ -257,7 +257,6 @@ class Connection
 
         /** @var ResponseAbstract $response */
         $response = $this->middlewareManager->peel($request, function($request) use ($responseClass) {
-
             try {
                 $response = $this->httpClient->send($request->newPsr7Request());
             } catch( BadResponseException $badResponseException ){
@@ -267,6 +266,7 @@ class Connection
             return new $responseClass($response);
 
         });
+        
         $stop = microtime(true);
 
         // Should we log this request?
