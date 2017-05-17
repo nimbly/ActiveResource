@@ -1,23 +1,10 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 1/9/17
- * Time: 4:18 PM
- */
 
 namespace ActiveResource;
 
 
 class Collection implements \IteratorAggregate, \Countable, \ArrayAccess
 {
-
-    /** @var  Request */
-    protected $request;
-
-    /** @var ResponseAbstract  */
-    protected $response;
-
     /** @var Model[] */
     protected $objects = [];
 
@@ -26,48 +13,11 @@ class Collection implements \IteratorAggregate, \Countable, \ArrayAccess
 
     /**
      * Collection constructor.
-     * @param string $className
      * @param array $data
-     * @param Request|null $request
-     * @param ResponseAbstract|null $response
      */
-    public function __construct($className, array $data = [], Request $request = null, ResponseAbstract $response = null)
+    public function __construct(array $data = [])
     {
-        foreach($data as $object)
-        {
-            $this->objects[] = new $className($object, true);
-        }
-
-        $this->request = $request;
-        $this->response = $response;
-    }
-
-    /**
-     * Get the Request object from the last API call
-     *
-     * @return Request
-     */
-    public function getRequest()
-    {
-        return $this->request;
-    }
-
-    /**
-     * Get the Response object from the last API call
-     *
-     * @return ResponseAbstract
-     */
-    public function getResponse()
-    {
-        return $this->response;
-    }
-
-    /**
-     * @param ResponseAbstract $response
-     */
-    public function setResponse(ResponseAbstract $response)
-    {
-        $this->response = $response;
+		$this->objects = $data;
     }
 
     public function getIterator()

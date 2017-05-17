@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 1/7/17
- * Time: 10:19 AM
- */
 
 namespace ActiveResource;
 
@@ -14,7 +8,6 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\ConnectException;
 use Optimus\Onion\Onion;
-use Psr\Http\Message\ResponseInterface;
 
 class Connection
 {
@@ -43,6 +36,14 @@ class Connection
      */
     const OPTION_DEFAULT_HEADERS = 'defaultHeaders';
 
+	/**
+	 * The default Content-Type when sending requests with a body (POST, PUT, PATCH)
+	 *
+	 * Type: string
+	 * Default: 'application/json'
+	 */
+	const OPTION_DEFAULT_CONTENT_TYPE = 'defaultContentType';
+
     /**
      * An array of key => value pairs to include in the query params with each request.
      *
@@ -52,29 +53,21 @@ class Connection
     const OPTION_DEFAULT_QUERY_PARAMS = 'defaultQueryParams';
 
     /**
-     * Request body format - either 'json', 'form', or null for pass-through
-     *
-     * Type: string
-     * Options: 'json', 'form', null
-     * Default: 'json'
-     */
-    const OPTION_REQUEST_BODY_FORMAT = 'requestBodyFormat';
-
-    /**
-     * Error class name
-     *
-     * Type: string
-     * Default: null
-     */
-    const OPTION_ERROR_CLASS = 'errorClass';
-
-    /**
      * Response class name
      *
      * Type: string
-     * Default: null
+     * Default: 'ActiveResource\\Response'
      */
     const OPTION_RESPONSE_CLASS = 'responseClass';
+
+	/**
+	 * Name of custom Collection class to use to pass array of models to. Class must allow passing in array of data into
+	 * constructor. Set to NULL to return a simple Array of objects.
+	 *
+	 * Type: string
+	 * Default: 'ActiveResource\\Collection'
+	 */
+	const OPTION_COLLECTION_CLASS = 'collectionClass';
 
     /**
      * HTTP method to use for updates
@@ -109,19 +102,33 @@ class Connection
      */
     const OPTION_LOG = 'log';
 
+	/**
+	 * Common API content types
+	 */
+	const CONTENT_TYPE_JSON = 'application/json';
+	const CONTENT_TYPE_XML = 'application/xml';
+	const CONTENT_TYPE_FORM = 'application/x-www-form-urlencoded';
+
+
     /** @var array  */
     protected $options = [
         self::OPTION_BASE_URI => null,
         self::OPTION_DEFAULT_HEADERS => [],
+		self::OPTION_DEFAULT_CONTENT_TYPE => self::CONTENT_TYPE_JSON,
         self::OPTION_DEFAULT_QUERY_PARAMS => [],
-        self::OPTION_REQUEST_BODY_FORMAT => 'json',
-        self::OPTION_ERROR_CLASS => 'ActiveResource\\Error',
         self::OPTION_RESPONSE_CLASS => 'ActiveResource\\Response',
+		self::OPTION_COLLECTION_CLASS => 'ActiveResource\\Collection',
         self::OPTION_UPDATE_METHOD => 'put',
         self::OPTION_UPDATE_DIFF => false,
         self::OPTION_MIDDLEWARE => [],
         self::OPTION_LOG => false,
     ];
+
+	/** @var Request */
+	protected $request;
+
+	/** @var ResponseAbstract */
+	protected $response;
 
     /**
      * Connection constructor.
@@ -206,25 +213,16 @@ class Connection
         // Merge in default query params
         $queryParams = array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS), $queryParams);
 
-        // Process the body
-        if( $body ){
-            $format = $this->getOption(self::OPTION_REQUEST_BODY_FORMAT);
-
-            if( $format == 'json' ){
-                $headers['Content-Type'] = 'application/json';
-                $body = json_encode($body);
-            }
-
-            if( $format == 'form' ){
-                $headers['Content-Type'] = 'application/x-www-form-urlencoded';
-                $body = http_build_query($body, null, '&');
-            }
-        }
-
-        // If we have a falsey body, set body to null
+        // If we have an empty/falsey body, set body to null
         if( empty($body) ){
             $body = null;
         }
+
+        // Set the default Content-Type header for request types with a message body
+        if( in_array($method, ['POST', 'PUT', 'PATCH']) &&
+			($contentType = $this->getOption(self::OPTION_DEFAULT_CONTENT_TYPE)) ){
+			$headers['Content-Type'] = $contentType;
+		}
 
         // Merge in default headers
         $headers = array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS), $headers);
@@ -252,11 +250,15 @@ class Connection
         // Get the response class name to instantiate (to pass into Middleware)
         $responseClass = $this->getOption(self::OPTION_RESPONSE_CLASS);
 
-        // Run the request
+		// Capture start time (for logging requests)
         $start = microtime(true);
 
+        // Save the request object so it may be retrieved
+		$this->request = $request;
+
+		// Run the request
         /** @var ResponseAbstract $response */
-        $response = $this->middlewareManager->peel($request, function($request) use ($responseClass) {
+        $response = $this->middlewareManager->peel($request, function(Request $request) use ($responseClass) {
             try {
                 $response = $this->httpClient->send($request->newPsr7Request());
             } catch( BadResponseException $badResponseException ){
@@ -264,10 +266,13 @@ class Connection
             }
 
             return new $responseClass($response);
-
         });
-        
+
+        // Capture end time
         $stop = microtime(true);
+
+        // Save the response object so it may be retrieved
+		$this->response = $response;
 
         // Should we log this request?
         if( $this->getOption(self::OPTION_LOG) ){
@@ -329,4 +334,24 @@ class Connection
             $this->middlewareManager = new Onion($layers);
         }
     }
+
+	/**
+	 * Get the last Request object
+	 *
+	 * @return \ActiveResource\Request
+	 */
+    public function getLastRequest()
+	{
+		return $this->request;
+	}
+
+	/**
+	 * Get the last Response object
+	 *
+	 * @return ResponseAbstract
+	 */
+	public function getLastResponse()
+	{
+		return $this->response;
+	}
 }

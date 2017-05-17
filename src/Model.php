@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 1/7/17
- * Time: 10:01 AM
- */
 
 namespace ActiveResource;
 
@@ -44,7 +38,7 @@ abstract class Model
     /**
      * When set to array of property names, only these properties are allowed to be mass assigned when calling the fill() method.
      *
-     * If null, *all* properties will be mass assigned.
+     * If null, *all* properties can be mass assigned.
      *
      * @var null|array
      */
@@ -70,15 +64,6 @@ abstract class Model
 
     /** @var array $dependentResources */
     private $dependentResources = [];
-
-    /** @var Request */
-    protected $request;
-
-    /** @var ResponseAbstract */
-    protected $response;
-
-    /** @var ErrorAbstract */
-    private $error = null;
 
     /**
      * Model constructor.
@@ -150,36 +135,6 @@ abstract class Model
     }
 
     /**
-     * Get the Request object from the last API call
-     *
-     * @return Request
-     */
-    public function getRequest()
-    {
-        return $this->request;
-    }
-
-    /**
-     * Get the Response object from the last API call
-     *
-     * @return ResponseAbstract
-     */
-    public function getResponse()
-    {
-        return $this->response;
-    }
-
-    /**
-     * Get the error object
-     *
-     * @return ErrorAbstract|null
-     */
-    public function getError()
-    {
-        return $this->error;
-    }
-
-    /**
      * Save the entity
      *
      * @param array $queryParams
@@ -200,7 +155,7 @@ abstract class Model
         // Existing resource, update (PUT/PATCH) resource instance
         else {
 
-            // Can we just send the modified fields?
+            // Can we just send the modified properties? (i.e. a PATCH)
             if( $this->getConnection()->getOption(Connection::OPTION_UPDATE_DIFF) ){
                 $data = $this->modifiedProperties;
             }
@@ -215,22 +170,19 @@ abstract class Model
         }
 
         // Build request object
-        $this->request = $this->getConnection()->buildRequest($method, $this->getResourceUri(), $queryParams, $data, $headers);
+        $request = $this->getConnection()->buildRequest($method, $this->getResourceUri(), $queryParams, $this->encode($data), $headers);
 
         // Do the update
-        $this->response = $this->getConnection()->send($this->request);
-        if( $this->response->isSuccessful() ){
-            $this->hydrate($this->parseFind($this->response->getPayload()));
-            $this->error = null;
+        $response = $this->getConnection()->send($request);
+        if( $response->isSuccessful() ){
+            $this->hydrate($this->parseFind($response->getPayload()));
             $this->modifiedProperties = [];
             return true;
         }
 
-        // Set the error
-        $this->error = $this->buildError($this->response);
-
-        if( $this->response->isThrowable() ) {
-            throw new ActiveResourceResponseException($this->error);
+        // Should we throw an exception?
+        if( $response->isThrowable() ) {
+            throw new ActiveResourceResponseException($response);
         }
 
         return false;
@@ -247,21 +199,17 @@ abstract class Model
     public function destroy(array $queryParams = [], array $headers = [])
     {
         // Build request
-        $this->request = $this->getConnection()->buildRequest('delete', $this->getResourceUri(), $queryParams, null, $headers);
+        $request = $this->getConnection()->buildRequest('delete', $this->getResourceUri(), $queryParams, null, $headers);
 
         // Get response
-        $this->response = $this->getConnection()->send($this->request);
-        if( $this->response->isSuccessful() ){
-            $this->error = null;
+        $response = $this->getConnection()->send($request);
+        if( $response->isSuccessful() ){
             return true;
         }
 
-        // Set the error
-        $this->error = $this->buildError($this->response);
-
         // Throw if needed
-        if( $this->response->isThrowable() ) {
-            throw new ActiveResourceResponseException($this->error);
+        if( $response->isThrowable() ) {
+            throw new ActiveResourceResponseException($response);
         }
 
         return false;
@@ -291,15 +239,15 @@ abstract class Model
      * @param string $model
      * @param array $data
      *
-     * @return Collection
+     * @return array|mixed
      */
     public function includesMany($model, array $data)
     {
         if( empty($data) ){
-            return new Collection($model, []);
+            return $this->buildCollection($model, []);
         }
 
-        return new Collection($model, $data);
+        return $this->buildCollection($model, $data);
     }
 
     /**
@@ -326,7 +274,7 @@ abstract class Model
      * Set dependent resources to prepend to URI. You can call this method multiple times to prepend additional dependent
      * resources.
      *
-     * For example, if the API only allows you create a new comment on a post *through* the post's URI:
+     * For example, if the API only allows you to create a new comment on a post *through* the post's URI:
      *  POST /posts/1234/comment
      *
      * $comment = new Comment;
@@ -451,6 +399,25 @@ abstract class Model
         return json_encode($this->toArray());
     }
 
+	/**
+	 * Default encode method for Request payloads. Need to send JSON or XML or something else?
+	 *
+	 * Gets called for all PUT/POST/PATCH calls to the API.
+	 *
+	 * You should override this method in your models (if necessary) or in a BaseModel class. This is also a good
+	 * place to add any extra markup needed in the request body. For example:
+	 *
+	 * return json_encode(['data' => $data]);
+	 *
+	 * @param string
+	 *
+	 * @return string
+	 */
+    protected function encode($data)
+	{
+		return json_encode($data);
+	}
+
     /**
      * Get the model's resource name (defaults to lowercase class name)
      *
@@ -485,6 +452,15 @@ abstract class Model
     {
         return ConnectionManager::get($this->connectionName);
     }
+
+	/**
+	 * Get the API connection for the model
+	 *
+	 * @return Connection
+	 */
+	public static function connection(){
+		return self::getCalledClassInstance()->getConnection();
+	}
 
     /**
      * Return an instance of the called class
@@ -626,14 +602,12 @@ abstract class Model
         // Send the request
         $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
-            $instance->request = $request;
-            $instance->response = $response;
             $instance->hydrate($instance->parseFind($response->getPayload()));
             return $instance;
         }
 
         if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($instance->buildError($response));
+            throw new ActiveResourceResponseException($response);
         }
 
         return false;
@@ -650,7 +624,7 @@ abstract class Model
      *
      * @throws ActiveResourceResponseException
      *
-     * @return Collection|boolean
+     * @return array|boolean|mixed
      */
     public static function all(array $queryParams = [], array $headers = [])
     {
@@ -663,11 +637,11 @@ abstract class Model
         $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
             $data = $instance->parseAll($response->getPayload());
-            return new Collection(get_called_class(), $data, $request, $response);
+            return $instance->buildCollection(get_called_class(), $data);
         }
 
         if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($instance->buildError($response));
+            throw new ActiveResourceResponseException($response);
         }
 
         return false;
@@ -699,7 +673,7 @@ abstract class Model
         }
 
         if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($instance->buildError($response));
+            throw new ActiveResourceResponseException($response);
         }
 
         return false;
@@ -737,16 +711,13 @@ abstract class Model
 
         // Do request
         $response = $instance->getConnection()->send($request);
-
         if( $response->isSuccessful() ) {
             $instance->hydrate($instance->parseFind($response->getPayload()));
-            $instance->request = $request;
-            $instance->response = $response;
             return $instance;
         }
 
         if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($instance->buildError($response));
+            throw new ActiveResourceResponseException($response);
         }
 
         return false;
@@ -785,34 +756,55 @@ abstract class Model
         $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
             $data = $instance->parseAll($response->getPayload());
-            return new Collection(get_called_class(), $data, $request, $response);
+            return $instance->buildCollection(get_called_class(), $data);
         }
 
         if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($instance->buildError($response));
+            throw new ActiveResourceResponseException($response);
         }
 
         return false;
     }
 
-    /**
-     * Build an instance of an Error response object
-     *
-     * @param ResponseAbstract $response
-     * @return ErrorAbstract
-     */
-    protected function buildError(ResponseAbstract $response)
-    {
-        $errorClass = $this->getConnection()->getOption(Connection::OPTION_ERROR_CLASS);
-        return new $errorClass($response);
-    }
+	/**
+	 * Build a collection of models
+	 *
+	 * @param string $model
+	 * @param array $data
+	 *
+	 * @return array|mixed
+	 */
+    protected function buildCollection($model, array $data)
+	{
+		$instances = [];
+		foreach( $data as $object ){
+			$instances[] = new $model($object);
+		}
 
-    /**
-     * Get the API connection
-     *
-     * @return Connection
-     */
-    public static function connection(){
-        return self::getCalledClassInstance()->getConnection();
-    }
+		if( ($collectionClass = $this->getConnection()->getOption(Connection::OPTION_COLLECTION_CLASS)) ){
+			return new $collectionClass($instances);
+		}
+
+		return $instances;
+	}
+
+	/**
+	 * Get the Request object from the last API call
+	 *
+	 * @return Request
+	 */
+	public function getRequest()
+	{
+		return $this->getConnection()->getLastRequest();
+	}
+
+	/**
+	 * Get the Response object from the last API call
+	 *
+	 * @return ResponseAbstract
+	 */
+	public function getResponse()
+	{
+		return $this->getConnection()->getLastResponse();
+	}
 }

@@ -1,27 +1,21 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 1/12/17
- * Time: 1:59 PM
- */
 
 namespace ActiveResource;
 
 
 class ActiveResourceResponseException extends \RuntimeException
 {
-    protected $error = null;
+    protected $response = null;
 
-    public function __construct(ErrorAbstract $error)
+    public function __construct(ResponseAbstract $response)
     {
-        parent::__construct($error->getMessage(), $error->getResponse()->getStatusCode(), null);
+        parent::__construct($response->getStatusPhrase(), $response->getStatusCode(), null);
 
-        $this->error = $error;
+        $this->response = $response;
     }
 
-    public function getError()
+    public function getResponse()
     {
-        return $this->error;
+        return $this->response;
     }
 }

@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 1/26/17
- * Time: 2:32 PM
- */
 
 namespace ActiveResource;
 

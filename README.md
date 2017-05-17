@@ -55,7 +55,7 @@ for full configuration options, custom `Response` and `Error` classes, and Middl
         /**
         * The single user object can be found at $.data.user
         *
-        * Sample parsed payload:
+        * Sample response payload:
         *
         *    {
         *        "data": {
@@ -158,8 +158,8 @@ for full configuration options, custom `Response` and `Error` classes, and Middl
     if( $post->author->save() == false )
     {
         // Looks like that email address is already being used
-        $code = $post->getError()->getStatusCode(); // 409
-        $error = $post->getError()->getMessage(); // Conflict    
+        $code = $post->getResponse()->getStatusCode(); // 409
+        $error = $post->getResponse()->getStatusPhrase(); // Conflict    
     }
     
     // Get user ID=1
@@ -215,11 +215,16 @@ The options array may contain:
 
 `defaultQueryParams` *array* Key => value pairs to include in the query with every request.
 
-`errorClass` *string* Class name of the Error class to use for interacting with error responses from the API. Default
-is ActiveResource's default Error class. See Error section for more info.
+`defaultContentType` *string* The default Content-Type request header to use for requests that include a message body
+(PUT, POST, PATCH). Defaults to `application/json`. Some common content type strings are available as class constants on
+the `Connection` class.
 
 `responseClass` *string* Class name of the Response class to use for parsing responses including headers and body. Default
-is ActiveResource's default Response class. SeeResponse section for more info.
+is `ActiveResource\Response` class. See Response section for more info.
+
+`collectionClass` *string* Class name of a Collection class to use for handling arrays of models returned in a response.
+The Collection class must accept an array of objects in its constructor. Default is `ActiveResource\Collection` class.
+Set to `null` to return a simple PHP array of model instances. 
 
 `updateMethod` *string* HTTP method to use for updates. Defaults to `put`.
 
@@ -229,6 +234,9 @@ is ActiveResource's default Response class. SeeResponse section for more info.
 
 `log` *boolean* Tell ActiveResource to log all requests and responses. Defaults to `false`. Do not use this option
 in production environments. You can access the log via the Connection getLog() method via the ConnectionManager.
+
+
+All of the above string options are available as class constants on the `Connection` class.
 
 ##### HttpClient
 An optional instance of `GuzzleHttp\Client`. If you do not provide an instance, one will be created automatically
@@ -267,10 +275,10 @@ create an abstract BaseModel with the connectionName property set and extend you
 ## Response
 Although ActiveResource comes with a basic Response class (that simply JSON decodes the response body), each and every
 API responds with its own unique payload and encoding and it is recommended you provide your own custom response class that
-extends `\ActiveResource\ResponseAbstract`.
+extends `\ActiveResource\ResponseAbstract`. See Connection option `responseClass`.
 
 ### Required method implementation
-`parse` Accepts the raw payload contents from the response. Should return an array or \StdClass
+`decode` Accepts the raw payload contents from the response. Should return an array or \StdClass
 object representing the data. See Expected Data Format for more details.
 
 `isSuccessful` Should return a boolean indicating whether the request was successful or not. Some APIs
@@ -285,7 +293,7 @@ are working with.
     
     class Response extends \ActiveResource\ResponseAbstract
     {
-        public function parse($payload)
+        public function decode($payload)
         {
             return json_decode($payload);
         }
@@ -308,8 +316,8 @@ are working with.
     
 
 ## Expected data format
-In order for ActiveResource to properly hydrate your Model instances, the parsed payload data must be
- formatted in the following pattern:
+In order for ActiveResource to properly hydrate your Model instances, the decoded response payload must be formatted in
+ the following pattern:
  
      {
          property1: "value",
@@ -362,40 +370,7 @@ In order for ActiveResource to properly hydrate your Model instances, the parsed
     }    
 
 If the API you are working with does not have its data formatted in this manor - you will need to transform it so that it is.
-This can (and should) be done in your `Response` class `parse` method.
-
-    
-## Error
-Although ActiveResource comes with a basic Error class, each API responds differently for its errors and it is
-highly recommended to implement your own Error class that extends `ErrorAbstract`. The `ErrorAbstract` class is
-instantiated with the Response instance.
-
-The Error object is also a great way to include any other methods to access other properties
-of the error response.
-
-#### Required method implementation
-`getMessage` Should return the error message from the error response returned by the API.
-
-###### Example
-
-    class Error extends \ActiveResource\ErrorAbstract
-    {
-        /**
-        *   Get the error message returned by the API
-        */
-        public function getMessage()
-        {
-            return $this->getResponse()->getPayload()->error->message;
-        }
-        
-        /**
-        *   Get the validation error fields returned by the API
-        */
-        public function getFields()
-        {
-            return $this->getResponse()->getPayload()->error->fields;
-        }
-    }
+This can (and should) be done in your `Response` class `decode` method.
 
 ## Models
 Create your model classes and extend them from `\ActiveResource\Model`.
@@ -406,6 +381,13 @@ Create your model classes and extend them from `\ActiveResource\Model`.
 `resourceName` Name of the API resource URI. Defaults to name of class.
 
 `resourceIdentifier` Name of the field to use as the ID. Defaults to `id`.
+
+`readOnlyProperties` Array of property names that are read only. When set to null or empty array, all properties are writable.
+
+`fillableProperties` When set to array of property names, only these properties are allowed to be mass assigned when calling the fill() method.
+If null, *all* properties can be mass assigned.
+
+`excludedProperties` Array of property names that are excluded when saving/updating model to API. If null or empty array, all properties can be sent when saving model.
 
 ##### Static methods
 `find` Find a single instance of a resource given its ID. Assumes payload will return *single* object.
@@ -420,6 +402,8 @@ a comment through its post `/posts/1234/comments/5678`.
 `allThrough` Get all instances of a resource *through* another resource. For example, if you have
 to retrieve comments through its post `/posts/1234/comments`.
 
+`connection` Get the model's `Connection` instance.
+
 ##### Instance methods
 `fill` Mass assign object properties with an array of key/value pairs.
 
@@ -427,22 +411,11 @@ to retrieve comments through its post `/posts/1234/comments`.
 
 `destroy` Destroy (delete) the instance.
 
+`getConnection` Get the model's `Connection` instance.
+
+`getRequest` Get the `Request` object for the last request.
+
 `getResponse` Get the `Response` object for the last request.
-
-`getError` Get the `Error` object for the last request.
-
-`parseFind` Tells the Model class where in the payload to look for the data for a single resource. This method is called when using the
-            `find` static method or the `save` instance method. The `parseFind` method accepts a
-            single parameter containing the parsed/decoded payload and should return an object or an associative array containing the instance
-            data. If you do not specify this method on your model, ActiveResource will pass the full payload to hydrate the model.
-            Unless the API you are working with returns all relevant data in the root of the response, you *need* to implement
-            this method. See Expected Data Format for more information.
-
-`parseAll` Tells the Model class where in the payload to look for the data for an array of resources. This method is called when using the
-           `all` static method. This method accepts a single parameter containing the parsed/decoded payload and should return an
-           object or an associative array containing the instance data. If you do not specify this method on your model,
-           ActiveResource will pass the full payload to hydrate the model. Unless the API you are working with returns all relevant data in the root of the response, you *need* to implement
-           this method.See Expected Data Format for more information.
 
 `includesOne` Tells the Model class that the response includes a single instance of another
 model class. ActiveResource will then create an instance of the model and hydrate with the data.
@@ -450,8 +423,30 @@ model class. ActiveResource will then create an instance of the model and hydrat
 `includesMany` Tells the Model class that the response includes an array of instances of another
 model class. ActiveResource will then create a Collection of hydrated model instances.
 
-You can also define `public` methods with the same name as an instance property that the model will send the data to. You
-can then modify the data or more commonly, create a new model instance representing the data.
+`parseFind` Tells the Model class where in the response payload to look for the data for a single resource. This method
+            is called when using the `find` and `findThrough` static methods and the `save` instance method. The `parseFind` method accepts
+            a single parameter containing the decoded payload and should return an object or an associative array
+            containing the instance data. If you do not specify this method on your model, ActiveResource will pass the
+            full payload to hydrate the model. Unless the API you are working with returns all relevant data in the root
+            of the response, you *must* implement this method. See Expected Data Format for more information.
+
+`parseAll` Tells the Model class where in the response payload to look for the data for an array of resources. This
+            method is called when using the `all` and `allThrough` static methods. This method accepts a single
+            parameter containing the decoded response payload and should return an object or an associative array
+            containing the instance data. If you do not specify this method on your model, ActiveResource will pass the
+            full payload to hydrate the model. Unless the API you are working with returns all relevant data in the root
+            of the response, you *must* implement this method. See Expected Data Format for more information.
+
+`encode` Called before sending a request to format and encode the model instance into a request body. Defaults to json_encode().
+You should override this method if you need a different format or encoding for the API you are working with.
+
+`reset` Resets the state of the model to its original condition - i.e. all modified properties are reverted.
+
+`original` Returns the original value of a property.
+
+
+You can also define `public` methods with the same name as an instance property that the model will send the data to.
+You can then modify the data or more commonly, create a new model instance representing the data.
  
 For example, say you are interacting with a blog API that has blog posts, users, and comments. You create the three model
 classes representing the API resources.
@@ -548,8 +543,8 @@ The response from the API looks like:
         }
     }            
     
-ActiveResource will automatically hydrate model instances for comments and authors (users) on the Posts instance. These instances
- can then be modified and updated or even deleted.
+ActiveResource will automatically hydrate model instances for comments and authors (users) on the Posts instance. These
+instances can then be modified and updated or even deleted.
 
 ## Middleware
 
@@ -681,8 +676,8 @@ No, you don't. Create an abstract BaseModel class with the `parseFind` and `pars
 all your models from that BaseModel.
 
 ##### How do I handle JSON-API responses?
-In your `Response` object `parse` method you'll need to do a lot of work, but it can be done. ActiveResource
-is looking for the parsed payload data to be in a specific format. See Expected Data Format for more information.
+In your `Response` object `decode` method you'll need to do a lot of work, but it can be done. ActiveResource
+is looking for the decoded payload data to be in a specific format. See Expected Data Format for more information.
 
 ##### How do I access response headers?
 You can access the `Response` object for the last API request via the Model's `getResponse` method. The `Response` object

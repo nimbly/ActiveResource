@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 1/12/17
- * Time: 12:12 PM
- */
 
 namespace ActiveResource;
 
@@ -12,12 +6,12 @@ namespace ActiveResource;
 class Response extends ResponseAbstract
 {
     /**
-     * Parse/decode the response body
+     * Decode the response body
      *
      * @param string $body
      * @return mixed
      */
-    public function parse($body)
+    public function decode($body)
     {
         return json_decode($body);
     }

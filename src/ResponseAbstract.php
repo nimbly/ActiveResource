@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 1/11/17
- * Time: 10:53 PM
- */
 
 namespace ActiveResource;
 
@@ -214,7 +208,7 @@ abstract class ResponseAbstract
     }
 
     /**
-     * Get the raw (pre-parsed/decoded) response body
+     * Get the raw (pre-decoded) response body
      *
      * @return string
      */
@@ -224,14 +218,14 @@ abstract class ResponseAbstract
     }
 
     /**
-     * Set the raw response body and trigger the parser to update the payload
+     * Set the raw response body and trigger the decoder to update the payload
      *
      * @param $body
      */
     public function setBody($body)
     {
         $this->body = $body;
-        $this->payload = $this->parse($this->body);
+        $this->payload = $this->decode($this->body);
     }
 
     /**
@@ -255,12 +249,12 @@ abstract class ResponseAbstract
     }
 
     /**
-     * Parse/decode the response body for processing
+     * Decode the response body for processing
      *
      * @param string $body
      * @return mixed
      */
-    abstract public function parse($body);
+    abstract public function decode($body);
 
     /**
      * Whether this request was successful or not
