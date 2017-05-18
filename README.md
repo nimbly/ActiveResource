@@ -213,7 +213,7 @@ The options array may contain:
 
 `defaultHeaders` *array* Key => value pairs of headers to include with every request.
 
-`defaultQueryParams` *array* Key => value pairs to include in the query with every request.
+`defaultQueryParams` *array* Key => value pairs to include in the URL query part with every request.
 
 `defaultContentType` *string* The default Content-Type request header to use for requests that include a message body
 (PUT, POST, PATCH). Defaults to `application/json`. Some common content type strings are available as class constants on
@@ -223,8 +223,11 @@ the `Connection` class.
 is `ActiveResource\Response` class. See Response section for more info.
 
 `collectionClass` *string* Class name of a Collection class to use for handling arrays of models returned in a response.
-The Collection class must accept an array of objects in its constructor. Default is `ActiveResource\Collection` class.
-Set to `null` to return a simple PHP array of model instances. 
+The Collection class must accept an array of data in its constructor. Default is `ActiveResource\Collection` class.
+Set to `null` to return a simple PHP array of model instances.
+
+This option is useful if you're working with a framework, library, or custom code that has a robust Collection utility like
+Laravel's `Illuminate\Support\Collection`.
 
 `updateMethod` *string* HTTP method to use for updates. Defaults to `put`.
 
@@ -245,12 +248,11 @@ with no options set.
 ###### Example
 
     $options = [
-        'baseUri' => 'http://api.someurl.com/v1/',
-        'updateMethod' => 'patch',
-        'updateDiff' => true,
-        'responseClass' => \My\Custom\Response::class,
-        'errorClass' => \My\Custom\Error::class,
-        'middleware' => [
+        Connection::OPTION_BASE_URI => 'http://api.someurl.com/v1/',
+        Connection::OPTION_UPDATE_METHOD => 'patch',
+        Connection::OPTION_UPDATE_DIFF => true,
+        Connection::OPTION_RESPONSE_CLASS => \My\Custom\Response::class,
+        Connection::OPTION_MIDDLEWARE => [
             \My\Custom\Middleware\Authorize::class,
             \My\Custom\Middleware\Headers::class,
         ]
@@ -378,9 +380,9 @@ Create your model classes and extend them from `\ActiveResource\Model`.
 ##### Properties
 `connectionName` Name of connection to use. Defaults to `default`.
 
-`resourceName` Name of the API resource URI. Defaults to name of class.
+`resourceName` Name of the API resource URI. Defaults to lowercase name of class.
 
-`resourceIdentifier` Name of the field to use as the ID. Defaults to `id`.
+`resourceIdentifier` Name of the property to use as the ID. Defaults to `id`.
 
 `readOnlyProperties` Array of property names that are read only. When set to null or empty array, all properties are writable.
 
@@ -403,6 +405,10 @@ a comment through its post `/posts/1234/comments/5678`.
 to retrieve comments through its post `/posts/1234/comments`.
 
 `connection` Get the model's `Connection` instance.
+
+`request` Get the last request object.
+
+`response` Get the last response object.
 
 ##### Instance methods
 `fill` Mass assign object properties with an array of key/value pairs.
@@ -598,8 +604,8 @@ use logging in production environments.
 ###### Example
 
     $connection = new Connection([
-        'defaultUri' => 'https://someurl.com/v1/',
-        'log' => true,
+        Connection::OPTION_BASE_URI => 'https://someurl.com/v1/',
+        Connection::OPTION_LOG => true,
     ]);
     
     ConnectionManager::add('yourConnectionName', $connection);
@@ -660,12 +666,12 @@ If the Authorization scheme is either Basic or Bearer, the easiest way to add th
 ###### Example
         
         $options = [
-            'defaultUri' => 'http://myapi.com/v2/',
-            'defaultHeaders' => [
+            Connection::OPTION_BASE_URI => 'http://myapi.com/v2/',
+            Connection::OPTION_DEFAULT_HEADERS => [
                 'Authorization' => 'Bearer MYAPITOKEN',
-            ],        
+            ],
         ];
-        
+
         $connection = new Connection($options);
         
 For Authorization schemas that are a bit more complex (eg HMAC), use a Middleware approach. See the Middleware section
@@ -677,14 +683,13 @@ all your models from that BaseModel.
 
 ##### How do I handle JSON-API responses?
 In your `Response` object `decode` method you'll need to do a lot of work, but it can be done. ActiveResource
-is looking for the decoded payload data to be in a specific format. See Expected Data Format for more information.
+is looking for the decoded payload data to be in a specific format. See Expected Data Format for more information. For
+requests that need to be in JSON-API format, you'll need to do a lot of work in the Model `encode` method.
 
-##### How do I access response headers?
-You can access the `Response` object for the last API request via the Model's `getResponse` method. The `Response` object
-has methods for retrieving response headers.
-
-##### My API call is failing. How do I get access to the error response payload?
-You can access the `Error` object for the last API request via the model's `getError` method.
+##### How do I access the response object to pull out headers, status code, or parse and error payload?
+You can access the `Response` object for the last API request via the Model's `getResponse` instance method.
+The `Response` object has methods for retrieving response headers, status, and body. Alternatively, you can also access
+the response object statically via the model's `response` static method.
 
 ##### How can I throw an exception on certain HTTP response codes?
 The `Response` object has a protected array property called `throwable`. By default, HTTP Status 500 will throw an

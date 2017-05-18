@@ -1,26 +1,30 @@
 #!/bin/php
 <?php
 
+echo "\nTag and submit a new release of ActiveResource.\n\n";
+
 $currentVersion = file_get_contents('VERSION');
+echo "\nCurrent version: {$currentVersion}\n";
+
+$input = fopen("php://stdin", "r");
 
 if( isset($argv[1]) ) {
     $version = $argv[1];
+	echo "New version: {$version}\n\n";
+
 } else {
-	echo "\nCurrent version: {$currentVersion}\n";
-	echo "\n\nERROR: You must provide a version.\n\n";
-	exit;
+	echo "New version: ";
+	$version = trim(fgets($input));
+	echo "\n";
 }
 
-echo "\nTag and submit a new release of ActiveResource.\n\n";
-echo "Current version: {$currentVersion}\n";
-echo "New version: {$version}\n\n";
+if(empty($version)){
+    echo "Invalid version number.\nAborting.\n\n";
+    exit;
+}
 
 echo "Are you sure you want to do this?  Type 'yes' to continue: ";
-
-$input = fopen("php://stdin", "r");
-$response = trim(fgets($input));
-
-if( strtolower($response) !== 'yes' ){
+if( strtolower(trim(fgets($input))) !== 'yes' ){
 	echo "Aborting.\n\n";
 	exit;
 }
