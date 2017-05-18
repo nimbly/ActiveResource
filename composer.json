@@ -33,5 +33,11 @@
         "php": "^5.3.3 || ^7.0",
         "guzzlehttp\/guzzle": "^6.2",
         "optimus\/onion": "^1.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/",
+            "Tests\\Models\\": "tests/Models"
+        }
     }
 }

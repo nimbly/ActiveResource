@@ -298,19 +298,8 @@ class Connection
     private function addLog(Request $request, ResponseAbstract $response, $timing)
     {
         $this->log[] = [
-            'request' => [
-                'method' => $request->getMethod(),
-                'url' => $request->getUrl().$request->getQueryAsString(),
-                'query' => $request->getQueries(),
-                'headers' => $request->getHeaders(),
-                'body' => $request->getBody(),
-            ],
-            'response' => [
-                'status' => $response->getStatusCode(),
-                'phrase' => $response->getStatusPhrase(),
-                'headers' => $response->getHeaders(),
-                'body' => $response->getBody(),
-            ],
+            'request' => $request,
+            'response' => $response,
             'time' => $timing,
         ];
     }
