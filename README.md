@@ -322,17 +322,17 @@ In order for ActiveResource to properly hydrate your Model instances, the decode
  the following pattern:
  
      {
-         property1: "value",
-         property2: "value",
-         property3: "value",
-         related_single_resource: {
-             property1: "value",
-             property2: "value",
+         "property1": "value",
+         "property2": "value",
+         "property3": "value",
+         "related_single_resource": {
+             "property1": "value",
+             "property2": "value"
          },
-         related_multiple_resources: [
+         "related_multiple_resources": [
              {
-                 property1: "value",
-                 property2: "value"
+                 "property1": "value",
+                 "property2": "value"
              }
          ]
      }
@@ -346,7 +346,7 @@ In order for ActiveResource to properly hydrate your Model instances, the decode
         "author": {
             "id": "32135",
             "name": "John Doe",
-            "email": "jdoe@example.com",
+            "email": "jdoe@example.com"
         },
         "comments": [
             {
@@ -511,38 +511,38 @@ Now grab blog post ID 7.
 The response from the API looks like:
 
     {
-        data: {
-            post: {
-                id: 7,
-                title: "Blog post",
-                body: "I am a short blog post",
-                author: {
-                    id: 123,
-                    name: "John Doe",
-                    email: "jdoe@example.com"
+        "data": {
+            "post": {
+                "id": 7,
+                "title": "Blog post",
+                "body": "I am a short blog post",
+                "author": {
+                    "id": 123,
+                    "name": "John Doe",
+                    "email": "jdoe@example.com"
                 },
-                created_at: "2016-12-03 15:36:12",
-                comments: [
+                "created_at": "2016-12-03 15:36:12",
+                "comments": [
                     {
-                        id: 8,
-                        body: "Great article!",
-                        author: {
-                            id: 567,
-                            name: "Thomas Quigley",
-                            email: "tquigley@example.com"
+                        "id": 8,
+                        "body": "Great article!",
+                        "author": {
+                            "id": 567,
+                            "name": "Thomas Quigley",
+                            "email": "tquigley@example.com"
                         },
-                        created_at: "2016-12-04 09:18:45"
+                        "created_at": "2016-12-04 09:18:45"
                     },
                         
                     {
-                        id: 9,
-                        body: "Love the way your write",
-                        author: {
-                            id: 4178,
-                            name: "Jane Johnson",
-                            email: "jjohnson@example.com"
+                        "id": 9,
+                        "body": "Love the way your write",
+                        "author": {
+                            "id": 4178,
+                            "name": "Jane Johnson",
+                            "email": "jjohnson@example.com"
                         },
-                        created_at: "2016-12-04 11:29:18"
+                        "created_at": "2016-12-04 11:29:18"
                     }
                 ]
             }
