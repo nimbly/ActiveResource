@@ -1,6 +1,6 @@
 {
     "name": "nimbly\/activeresource",
-    "version": "0.5.1",
+    "version": "1.0",
     "description": "Use a RESTful resource based API like a database",
     "keywords": [
         "api",
@@ -36,8 +36,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/",
-            "Tests\\Models\\": "tests/Models"
+            "Tests\\": "tests\/",
+            "Tests\\Models\\": "tests\/Models"
         }
     }
 }
