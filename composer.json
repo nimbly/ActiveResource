@@ -3,8 +3,10 @@
     "version": "1.0",
     "description": "Use a RESTful resource based API like a database",
     "keywords": [
+	    "rest",
         "api",
         "php",
+	    "model",
         "resource",
         "database",
         "activerecord",
@@ -15,7 +17,7 @@
     "authors": [
         {
             "name": "Brent Scheffler",
-            "email": "brent@nimbly.io"
+            "email": "brent@brentscheffler.com"
         }
     ],
     "autoload": {
@@ -30,7 +32,7 @@
         }
     ],
     "require": {
-        "php": "^5.3.3 || ^7.0",
+        "php": "^5.4 || ^7.0",
         "guzzlehttp\/guzzle": "^6.2",
         "optimus\/onion": "^1.0"
     },
