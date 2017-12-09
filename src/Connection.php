@@ -3,7 +3,6 @@
 namespace ActiveResource;
 
 
-use ActiveResource\Request;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\BadResponseException;
 use GuzzleHttp\Exception\ConnectException;
@@ -191,43 +190,77 @@ class Connection
     }
 
     /**
+     * Set this connection to use the Basic authorization schema by providing the username and password.
+     *
+     * @param $username
+     * @param $password
+     * @return $this
+     */
+    public function useBasicAuthorization($username, $password)
+    {
+        $this->options[self::OPTION_DEFAULT_HEADERS] = array_merge(
+            $this->options[self::OPTION_DEFAULT_HEADERS],
+            ['Authorization' => 'Basic '.base64_encode("{$username}:{$password}")]
+        );
+
+        return $this;
+    }
+
+    /**
+     * Set this connection to use the Bearer authorization schema by providing the bearer token.
+     *
+     * @param $token
+     * @return $this
+     */
+    public function useBearerAuthorization($token)
+    {
+        $this->options[self::OPTION_DEFAULT_HEADERS] = array_merge(
+            $this->options[self::OPTION_DEFAULT_HEADERS],
+            ['Authorization' => "Bearer {$token}"]
+        );
+
+        return $this;
+    }
+
+    /**
      * Build an ActiveResource Request object instance using the connection's options.
      *
      * This Request object will be passed through the middleware layers.
      *
-     * @param string $method
+     * @param string $method HTTP method (get, post, put, delete, etc.)
      * @param string $url
-     * @param array $queryParams
-     * @param mixed|null $body
-     * @param array $headers
+     * @param array $queryParams Associative array of key=>value pairs to add to URL query
+     * @param string|null $body The body to send in the request
+     * @param array $headers Associative array of key=>value pairs to add to headers
      * @return Request
      */
     public function buildRequest($method, $url, array $queryParams = [], $body = null, array $headers = [])
     {
-        // Normalize method
-        $method = strtoupper($method);
+        $request = new Request;
 
-        // Prepend base URI
-        $url = $this->getOption(self::OPTION_BASE_URI) . $url;
+        // Set the request method
+        $request->setMethod(strtoupper($method));
 
-        // Merge in default query params
-        $queryParams = array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS), $queryParams);
+        // Set the URI
+        $request->setUrl($this->getOption(self::OPTION_BASE_URI) . $url);
 
-        // If we have an empty/falsey body, set body to null
-        if( empty($body) ){
-            $body = null;
+        // Set the query params
+        $request->setQueries(array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS), $queryParams));
+
+        // Set the request body
+        $request->setBody($body);
+
+        // Set the headers
+        $request->setHeaders(array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS), $headers));
+
+        // Check for Content-Type header and set it
+        if( in_array($request->getMethod(), ['POST','PUT','PATCH']) &&
+            $request->getHeader('Content-Type') === null &&
+            ($contentType = $this->getOption(self::OPTION_DEFAULT_CONTENT_TYPE)) ){
+            $request->setHeader('Content-Type', $contentType);
         }
 
-        // Set the default Content-Type header for request types with a message body
-        if( in_array($method, ['POST', 'PUT', 'PATCH']) &&
-			($contentType = $this->getOption(self::OPTION_DEFAULT_CONTENT_TYPE)) ){
-			$headers['Content-Type'] = $contentType;
-		}
-
-        // Merge in default headers
-        $headers = array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS), $headers);
-
-        return new Request($method, $url, $queryParams, $headers, $body);
+        return $request;
     }
 
     /**

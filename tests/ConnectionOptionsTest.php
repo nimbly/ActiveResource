@@ -15,6 +15,8 @@ use ActiveResource\Request;
 use ActiveResource\ResponseAbstract;
 use GuzzleHttp\Psr7\Response;
 use Tests\Models\Blogs;
+use Tests\Models\CustomResponseClass;
+use Tests\Models\Users;
 
 class ConnectionOptionsTest extends BaseTestCase
 {
@@ -74,7 +76,17 @@ class ConnectionOptionsTest extends BaseTestCase
 
 	public function test_option_response_class()
 	{
-		
+	    $responses = [
+	        new Response(200),
+        ];
+
+	    ConnectionManager::add('default', new Connection([
+	        Connection::OPTION_RESPONSE_CLASS => '\\Tests\\Models\\CustomResponseClass',
+        ], $this->buildMockClient($responses)));
+
+	    $response = Users::find(1);
+
+	    $this->assertTrue($response->getResponse() instanceof CustomResponseClass);
 	}
 
 	public function test_option_log()

@@ -68,9 +68,8 @@ abstract class Model
     /**
      * Model constructor.
      * @param array|object|null $data
-     * @param bool $setResourceIdentifier
      */
-    public function __construct($data = null, $setResourceIdentifier = false)
+    public function __construct($data = null)
     {
         if( $this->fillableProperties !== null &&
             !is_array($this->fillableProperties) ){
@@ -86,10 +85,6 @@ abstract class Model
             !is_array($this->readOnlyProperties) ){
             throw new ActiveResourceException('Invalid readOnlyProperties on model');
         }
-
-        if( !empty($data) ){
-            $this->hydrate($data, $setResourceIdentifier);
-        }
     }
 
     /**
@@ -99,7 +94,7 @@ abstract class Model
      */
     public function getId()
     {
-        return $this->resourceIdentifier;
+        return $this->{$this->identifierName};
     }
 
     /**
@@ -148,12 +143,17 @@ abstract class Model
         $data = array_merge($this->properties, $this->modifiedProperties);
 
         // No id, new (POST) resource instance
-        if( empty($this->resourceIdentifier) ){
+        if( $this->{$this->identifierName} == false ){
             $method = 'post';
         }
 
         // Existing resource, update (PUT/PATCH) resource instance
         else {
+
+            // Don't update if no properties have been modified
+            if( empty($this->modifiedProperties) ){
+                return true;
+            }
 
             // Can we just send the modified properties? (i.e. a PATCH)
             if( $this->getConnection()->getOption(Connection::OPTION_UPDATE_DIFF) ){
@@ -431,14 +431,10 @@ abstract class Model
     {
         if( empty($this->resourceName) ){
 
-            $class = get_called_class();
+            $resourceName = get_called_class();
 
-            if( ($pos = strrpos($class, '\\')) ) {
-                $resourceName = substr($class, $pos + 1);
-            }
-
-            else {
-                $resourceName = $class;
+            if( ($pos = strrpos($resourceName, '\\')) !== false ) {
+                $resourceName = substr($resourceName, $pos + 1);
             }
 
             $this->resourceName = strtolower($resourceName);
@@ -528,13 +524,10 @@ abstract class Model
      * Hydrate model instance
      *
      * @param array|object $data
-     * @param bool $setResourceIdentifier
-     *
      * @throws ActiveResourceException
-     *
      * @return boolean
      */
-    protected function hydrate($data, $setResourceIdentifier = true)
+    protected function hydrate($data)
     {
         if( empty($data) ){
             return true;
@@ -555,10 +548,6 @@ abstract class Model
                 }
 
                 $this->properties[$property] = $value;
-            }
-
-            if( $setResourceIdentifier ){
-                $this->resourceIdentifier = $this->{$this->identifierName};
             }
 
             return true;
@@ -598,10 +587,11 @@ abstract class Model
     public static function find($id = null, array $queryParams = [], array $headers = [])
     {
         $instance = self::getCalledClassInstance();
-        $instance->setResourceIdentifier($id);
+
+        $uri = $instance->getResourceUri() . "/{$id}";
 
         // Build the request object
-        $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
+        $request = $instance->getConnection()->buildRequest('get', $uri, $queryParams, null, $headers);
 
         // Send the request
         $response = $instance->getConnection()->send($request);
@@ -665,10 +655,11 @@ abstract class Model
     public static function delete($id, array $queryParams = [], array $headers)
     {
         $instance = self::getCalledClassInstance();
-        $instance->setResourceIdentifier($id);
+
+        $uri = $instance->getResourceUri() . "/{$id}";
 
         // Build request object
-        $request = $instance->getConnection()->buildRequest('delete', $instance->getResourceUri(), $queryParams, null, $headers);
+        $request = $instance->getConnection()->buildRequest('delete', $uri, $queryParams, null, $headers);
 
         // Send request
         $response = $instance->getConnection()->send($request);
@@ -707,11 +698,11 @@ abstract class Model
     public static function findThrough($resource, $id = null, array $queryParams = [], array $headers = [])
     {
         $instance = self::getCalledClassInstance();
-        $instance->setResourceIdentifier($id);
         $instance->through($resource);
+        $uri = $instance->getResourceUri() . "/{$id}";
 
         // Build request object
-        $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
+        $request = $instance->getConnection()->buildRequest('get', $uri, $queryParams, null, $headers);
 
         // Do request
         $response = $instance->getConnection()->send($request);

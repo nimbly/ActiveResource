@@ -30,6 +30,8 @@ for full configuration options, custom `Response` and `Error` classes, and Middl
 
 #### Create the connection
     
+```php
+
     $options = [
         Connection::OPTION_BASE_URI => 'https://someapi.com/v1/',
         Connection::OPTION_DEFAULT_HEADERS => [
@@ -38,12 +40,18 @@ for full configuration options, custom `Response` and `Error` classes, and Middl
     ];
     
     $connection = new Connection($options);
+```
     
 #### Add connection to ConnectionManager
+
+```php
     
     ConnectionManager::add('default', $connection);
+```
     
 #### Create your models
+
+```php
 
     use ActiveResource\Model;
     
@@ -137,8 +145,11 @@ for full configuration options, custom `Response` and `Error` classes, and Middl
         }
         
     }
+```
 
 #### Use your models
+
+```php
 
     $user = new User;
     $user->name = 'Brent Scheffler';
@@ -192,6 +203,7 @@ for full configuration options, custom `Response` and `Error` classes, and Middl
     
     // Or...
     $comments = Comments::allThrough("blogs/1");
+```
 
 #### That's it
 That's all there really is to using ActiveResource. Hopefully your API is mostly [RMM Level 2](https://martinfowler.com/articles/richardsonMaturityModel.html#level2)
@@ -247,6 +259,8 @@ with no options set.
 
 ###### Example
 
+```php
+
     $options = [
         Connection::OPTION_BASE_URI => 'http://api.someurl.com/v1/',
         Connection::OPTION_UPDATE_METHOD => 'patch',
@@ -259,6 +273,7 @@ with no options set.
     ];
     
     $connection = new \ActiveResource\Connection($options);
+```
 
 ### ConnectionManager
 
@@ -271,7 +286,10 @@ create an abstract BaseModel with the connectionName property set and extend you
 
 ###### Example
     
+```php
+
     ConnectionManager::add('yourConnectionName', $connection);
+```
 
 
 ## Response
@@ -292,7 +310,9 @@ related data or headers. It all depends on what data is in the response body for
 are working with.
 
 ###### Example
-    
+
+```php
+
     class Response extends \ActiveResource\ResponseAbstract
     {
         public function decode($payload)
@@ -315,11 +335,14 @@ are working with.
             return $this->getPayload()->envelope;
         }
     }
+```
     
 
 ## Expected data format
 In order for ActiveResource to properly hydrate your Model instances, the decoded response payload must be formatted in
  the following pattern:
+ 
+```json
  
      {
          "property1": "value",
@@ -336,8 +359,11 @@ In order for ActiveResource to properly hydrate your Model instances, the decode
              }
          ]
      }
+```
 
 ###### Example
+
+```json
 
     {
         "id": "1234",
@@ -369,7 +395,8 @@ In order for ActiveResource to properly hydrate your Model instances, the decode
                 }
             }
         ]
-    }    
+    }
+```
 
 If the API you are working with does not have its data formatted in this manor - you will need to transform it so that it is.
 This can (and should) be done in your `Response` class `decode` method.
@@ -459,11 +486,16 @@ classes representing the API resources.
 
 ###### Users
 
+```php
+
     class Users extends \ActiveResource\Model
     {
     }
+```
      
 ###### Comments
+
+```php
 
     class Comments extends \ActiveResource\Model
     {
@@ -472,8 +504,11 @@ classes representing the API resources.
             return $this->includesOne(Users::class, $data);
         }
     }
+```
 
 ###### Posts
+
+```php
 
     class Posts extends \ActiveResource\Model
     {
@@ -503,12 +538,18 @@ classes representing the API resources.
             return $payload->data->posts;
         }
     }
+```
 
 Now grab blog post ID 7.
  
+```php
+
     $posts = Posts::find(7);
+```
     
 The response from the API looks like:
+
+```php
 
     {
         "data": {
@@ -547,7 +588,8 @@ The response from the API looks like:
                 ]
             }
         }
-    }            
+    }
+```
     
 ActiveResource will automatically hydrate model instances for comments and authors (users) on the Posts instance. These
 instances can then be modified and updated or even deleted.
@@ -562,6 +604,8 @@ The input object is an `ActiveResource\Request` instance. The output is an insta
 
 ###### Example
     
+```php
+
     class Authorize implements LayerInterface
     {
         /**
@@ -594,6 +638,7 @@ The input object is an `ActiveResource\Request` instance. The output is an insta
             return $response;
         }
     }
+```
     
 ## Logging
 
@@ -603,6 +648,7 @@ use logging in production environments.
 
 ###### Example
 
+```php
     $connection = new Connection([
         Connection::OPTION_BASE_URI => 'https://someurl.com/v1/',
         Connection::OPTION_LOG => true,
@@ -615,48 +661,74 @@ use logging in production environments.
     $connection = ConnectionManager::get('yourConnectionName');
     $log = $connection->getLog();
     
-Or
+        // Or...
+
     
     $post->getConnection()->getLog();
-    
-Or
 
+       // Or...
+    
     Post::connection()->getLog();
+```
 
 ## Quick Start Examples
 
 ### Find a single resource
+
+```php
+
     $user = User::find(123);
+```
 
 ### Get all resources
+
+```php
+
     $users = User::all();
+```
 
 ### Creating a new resource
+
+```php
+
     $user = new User;
     $user->name = 'Test User';
     $user->email = 'test@example.com';
     $user->save();
+```
     
 ### Updating a resource
+
+```php
+
     $user = User::find(123);
     $user->status = 'INACTIVE';
     $user->save();
+```
     
 ### Quickly assign properties
+
+```php
+
     $user = User::find($id);
     $user->fill([
         'name' => 'Buckley',
         'email' => 'buckley@example.com',
     ]);
     $user->save();
+```
     
 ### Destroy (delete) a resource
+
+```php
+
     $user = User::find($id);
     $user->destory();
-
-Or
+    
+    // Or...
     
     User::delete($id);
+```
 
 ## FAQ
 ##### How do I send an Authorization header with every request?
@@ -665,6 +737,8 @@ If the Authorization scheme is either Basic or Bearer, the easiest way to add th
 
 ###### Example
         
+```php
+
         $options = [
             Connection::OPTION_BASE_URI => 'http://myapi.com/v2/',
             Connection::OPTION_DEFAULT_HEADERS => [
@@ -673,6 +747,7 @@ If the Authorization scheme is either Basic or Bearer, the easiest way to add th
         ];
 
         $connection = new Connection($options);
+```
         
 For Authorization schemas that are a bit more complex (eg HMAC), use a Middleware approach. See the Middleware section
 for more information.
@@ -702,8 +777,11 @@ Connection issues including timeouts will *always* throw a `GuzzleHttp\Exception
 You can send a custom request by getting the `Connection` object instance and using the `buildRequest` and `send`
 methods.
 
+```php
+
     $connection = ConnectionManager::get('yourConnectionName');
     $request = $connection->buildRequest('post', '/some/oddball/endpoint', ['param1' => 'value1'], ['foo' => 'bar', 'fox' => 'sox'], ['X-Custom-Header', 'Foo']);
     $response = $connection->send($request);
+```
     
 You'll get an instance of a `ResponseAbstract` object back.

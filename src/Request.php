@@ -3,6 +3,9 @@
 namespace ActiveResource;
 
 
+use \GuzzleHttp\Psr7\Request as Psr7Request;
+
+
 class Request
 {
     /** @var  string */
@@ -106,11 +109,8 @@ class Request
      */
     public function getQuery($name)
     {
-        foreach( $this->query as $query => $value )
-        {
-            if( strtolower($name) == strtolower($query) ){
-                return $value;
-            }
+        if( ($index = $this->findArrayIndex($name, $this->query)) ){
+            return $this->query[$index];
         }
 
         return null;
@@ -171,11 +171,8 @@ class Request
      */
     public function getHeader($name)
     {
-        foreach( $this->headers as $header => $value )
-        {
-            if( strtolower($name) == strtolower($header) ){
-                return $value;
-            }
+        if( ($index = $this->findArrayIndex($name, $this->headers)) ){
+            return $this->headers[$index];
         }
 
         return null;
@@ -189,7 +186,13 @@ class Request
      */
     public function setHeader($name, $value)
     {
-        $this->headers[$name] = $value;
+        if( ($index = $this->findArrayIndex($name, $this->headers)) ){
+            $this->headers[$index] = $value;
+        }
+
+        else {
+            $this->headers[$name] = $value;
+        }
     }
 
     /**
@@ -200,12 +203,9 @@ class Request
      */
     public function removeHeader($name)
     {
-        foreach( $this->headers as $header => $value )
-        {
-            if( strtolower($name) == strtolower($header) ){
-                unset($this->headers[$header]);
-                return true;
-            }
+        if( ($index = $this->findArrayIndex($name, $this->headers)) ){
+            unset($this->headers[$index]);
+            return true;
         }
 
         return false;
@@ -228,7 +228,31 @@ class Request
      */
     public function setBody($body)
     {
+        if( empty($body) ){
+            $body = null;
+        }
+
         $this->body = $body;
+    }
+
+
+    /**
+     * Find an array key (index) case-insensitive
+     * 
+     * @param $key
+     * @param array $array
+     * @return string|int|bool
+     */
+    protected function findArrayIndex($key, array $array)
+    {
+        foreach( $array as $k => $v )
+        {
+            if( strtolower($key) === strtolower($k) ){
+                return $k;
+            }
+        }
+
+        return false;
     }
 
 
@@ -239,6 +263,11 @@ class Request
      */
     public function newPsr7Request()
     {
-        return new \GuzzleHttp\Psr7\Request($this->method, $this->url.$this->getQueryAsString(), $this->headers, $this->body);
+        return new Psr7Request(
+            $this->method,
+            $this->url.$this->getQueryAsString(),
+            $this->headers,
+            $this->body
+        );
     }
 }
