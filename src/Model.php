@@ -85,6 +85,8 @@ abstract class Model
             !is_array($this->readOnlyProperties) ){
             throw new ActiveResourceException('Invalid readOnlyProperties on model');
         }
+
+        $this->hydrate($data);
     }
 
     /**
@@ -265,9 +267,7 @@ abstract class Model
         }
 
         /** @var self $instance */
-        $instance = new $model;
-        $instance->hydrate($data);
-        return $instance;
+        return new $model($data);
     }
 
     /**
