@@ -86,7 +86,7 @@ abstract class Model
             throw new ActiveResourceException('Invalid readOnlyProperties on model');
         }
 
-        $this->hydrate($data);
+        $this->fill($data);
     }
 
     /**
@@ -266,8 +266,12 @@ abstract class Model
             return $data;
         }
 
+        /** @var Model $modelInstance */
+        $modelInstance = new $model;
+        $modelInstance->hydrate($data);
+
         /** @var self $instance */
-        return new $model($data);
+        return $modelInstance;
     }
 
     /**
@@ -481,7 +485,7 @@ abstract class Model
      */
     protected function isModified()
     {
-        return count($this->modifiedProperties);
+        return count($this->modifiedProperties) > 0;
     }
 
     /**
@@ -773,7 +777,10 @@ abstract class Model
 	{
 		$instances = [];
 		foreach( $data as $object ){
-			$instances[] = new $model($object);
+		    /** @var Model $modelInstance */
+		    $modelInstance = new $model;
+		    $modelInstance->hydrate($object);
+			$instances[] = $model;
 		}
 
 		if( ($collectionClass = $this->getConnection()->getOption(Connection::OPTION_COLLECTION_CLASS)) ){
