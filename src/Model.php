@@ -86,7 +86,9 @@ abstract class Model
             throw new ActiveResourceException('Invalid readOnlyProperties on model');
         }
 
-        $this->fill($data);
+        if( !empty($data) ){
+            $this->fill($data);
+        }
     }
 
     /**
