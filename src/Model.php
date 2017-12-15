@@ -377,6 +377,37 @@ abstract class Model
     }
 
     /**
+     * Reset all data on model instance and reload from remote API.
+     *
+     * @param array $queryParams
+     * @param array $headers
+     * @return bool
+     */
+    public function refresh(array $queryParams = [], array $headers = [])
+    {
+        // Build the request object
+        $request = $this->getConnection()->buildRequest('get', $this->getResourceUri(), $queryParams, null, $headers);
+
+        // Send the request
+        $response = $this->getConnection()->send($request);
+        if( $response->isSuccessful() ) {
+
+            // Clear out all local properties and modified properties
+            $this->properties = [];
+            $this->modifiedProperties = [];
+
+            $this->hydrate($this->parseFind($response->getPayload()));
+            return true;
+        }
+
+        if( $response->isThrowable() ) {
+            throw new ActiveResourceResponseException($response);
+        }
+
+        return false;
+    }
+
+    /**
      * @return array
      */
     public function toArray()
@@ -782,7 +813,7 @@ abstract class Model
 		    /** @var Model $modelInstance */
 		    $modelInstance = new $model;
 		    $modelInstance->hydrate($object);
-			$instances[] = $model;
+			$instances[] = $modelInstance;
 		}
 
 		if( ($collectionClass = $this->getConnection()->getOption(Connection::OPTION_COLLECTION_CLASS)) ){
