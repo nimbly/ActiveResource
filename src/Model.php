@@ -413,23 +413,7 @@ abstract class Model
     public function toArray()
     {
         $properties = array_merge($this->properties, $this->modifiedProperties);
-
-        foreach( $properties as $property => $value )
-        {
-            if( $value instanceof Model )
-            {
-                $properties[$property] = $value->toArray();
-            }
-            elseif( $value instanceof \StdClass )
-            {
-                $properties[$property] = (array)$value;
-            }
-            else{
-                $properties[$property] = $value;
-            }
-        }
-
-        return $properties;
+        return self::objectToArray($properties);
     }
 
     /**
@@ -437,7 +421,40 @@ abstract class Model
      */
     public function toJson()
     {
-        return json_encode($this->toArray());
+        return json_encode($this->toArray(), JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Used to recursively convert model and relations into array
+     *
+     * @param $data
+     * @return array
+     */
+    private static function objectToArray($data)
+    {
+        $result = [];
+
+        foreach( $data as $property => $value )
+        {
+            if( $value instanceof Model )
+            {
+                $result[$property] = $value->toArray();
+            }
+            elseif( $value instanceof \StdClass )
+            {
+                $result[$property] = (array)$value;
+            }
+            elseif( is_array($value) ||
+                $value instanceof \ArrayAccess )
+            {
+                $result[$property] = self::objectToArray($value);
+            }
+            else{
+                $result[$property] = $value;
+            }
+        }
+
+        return $result;
     }
 
 	/**
