@@ -359,7 +359,7 @@ abstract class Model
      */
     public function original($property)
     {
-        if( in_array($property, $this->properties) ){
+        if( array_key_exists($property, $this->properties) ){
             return $this->properties[$property];
         }
 
