@@ -549,7 +549,7 @@ Now grab blog post ID 7.
     
 The response from the API looks like:
 
-```php
+```json
 
     {
         "data": {
