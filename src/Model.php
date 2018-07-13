@@ -52,7 +52,7 @@ abstract class Model
      * @var null|array
      */
     protected $excludedProperties = null;
-
+    
     /** @var string|integer|null $resourceIdentifier */
     private $resourceIdentifier = null;
 
@@ -71,21 +71,6 @@ abstract class Model
      */
     public function __construct($data = null)
     {
-        if( $this->fillableProperties !== null &&
-            !is_array($this->fillableProperties) ){
-            throw new ActiveResourceException('Invalid fillableProperties on model');
-        }
-
-        if( $this->excludedProperties !== null &&
-            !is_array($this->excludedProperties) ){
-            throw new ActiveResourceException('Invalid excludedProperties on model');
-        }
-
-        if( $this->readOnlyProperties !== null &&
-            !is_array($this->readOnlyProperties) ){
-            throw new ActiveResourceException('Invalid readOnlyProperties on model');
-        }
-
         if( !empty($data) ){
             $this->fill($data);
         }
@@ -151,7 +136,7 @@ abstract class Model
             $method = 'post';
         }
 
-        // Existing resource, update (PUT/PATCH) resource instance
+        // Existing resource, update (PUT/POST/PATCH depending on API) resource instance
         else {
 
             // Don't update if no properties have been modified
@@ -303,11 +288,19 @@ abstract class Model
     public function through($resource)
     {
         if( $resource instanceof Model ){
-            $this->dependentResources[] = $resource->getResourceUri();
+
+            if( !in_array($resource->getResourceUri(), $this->dependentResources) ){
+                $this->dependentResources[] = $resource->getResourceUri();
+            }
+            
         }
 
         else{
-            $this->dependentResources[] = $resource;
+
+            if( !in_array($resource, $this->dependentResources) ){
+                $this->dependentResources[] = $resource;
+            }
+            
         }
 
         return $this;
@@ -625,12 +618,12 @@ abstract class Model
 
 
     /**
-     * Find (GET) a specific resource by its ID (optional)
+     * Find (GET) a specific resource by its ID
      *
      * This method assumes the payload contains a *SINGLE* resource instance. This method will call the
      * parseFind method on the Model instance to know where to look in the payload to get the resource data.
      *
-     * @param integer|string|null $id
+     * @param integer|string $id
      * @param array $queryParams
      * @param array $headers
      *
@@ -638,7 +631,7 @@ abstract class Model
      *
      * @return Model|boolean
      */
-    public static function find($id = null, array $queryParams = [], array $headers = [])
+    public static function find($id, array $queryParams = [], array $headers = [])
     {
         $instance = self::getCalledClassInstance();
 
