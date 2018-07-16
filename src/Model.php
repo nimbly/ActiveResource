@@ -139,11 +139,6 @@ abstract class Model
         // Existing resource, update (PUT/POST/PATCH depending on API) resource instance
         else {
 
-            // Don't update if no properties have been modified
-            if( empty($this->modifiedProperties) ){
-                return true;
-            }
-
             // Can we just send the modified properties? (i.e. a PATCH)
             if( $this->getConnection()->getOption(Connection::OPTION_UPDATE_DIFF) ){
                 $data = $this->modifiedProperties;
