@@ -2,25 +2,15 @@
 
 namespace ActiveResource;
 
-
-class Response extends ResponseAbstract
+class Response
 {
-    /**
-     * Decode the response body
-     *
-     * @param string $body
-     * @return mixed
-     */
-    public function decode($body)
+    public function __construct(ResponseInterface $response)
     {
-        return json_decode($body);
+        
     }
 
-    /**
-     * @return bool
-     */
-    public function isSuccessful()
+    public function isSuccessful(): bool
     {
-        return $this->getStatusCode() < 400;
+        return $this->response->getStatusCode() < 400;
     }
 }

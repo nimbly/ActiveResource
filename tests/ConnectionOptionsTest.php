@@ -14,6 +14,8 @@ use ActiveResource\ConnectionManager;
 use ActiveResource\Request;
 use ActiveResource\ResponseAbstract;
 use GuzzleHttp\Psr7\Response;
+use Shuttle\Handler\MockHandler;
+use Shuttle\Shuttle;
 use Tests\Models\Blogs;
 use Tests\Models\CustomResponseClass;
 use Tests\Models\Users;
@@ -25,22 +27,30 @@ class ConnectionOptionsTest extends BaseTestCase
 	{
 		$baseUri = 'http://api.nimbly.io/v1/';
 
-		$connection = new Connection([
-			Connection::OPTION_BASE_URI => $baseUri,
-		]);
+		$connection = new Connection(
+			$this->buildMockClient(),
+			[
+				Connection::OPTION_BASE_URI => $baseUri,
+			]
+		);
 
 		$request = $connection->buildRequest('get', 'test/1');
 
-		$this->assertEquals($request->getUrl(), $baseUri.'test/1');
+		$this->assertEquals($request->getUri(), $baseUri.'test/1');
 	}
 
 	public function test_option_default_headers()
 	{
-		$connection = new Connection([
-			Connection::OPTION_DEFAULT_HEADERS => [
-				'X-Custom-Header' => 'Foo',
-			],
-		]);
+		$connection = new Connection(
+			$this->buildMockClient(),
+			[
+				Connection::OPTION_DEFAULT_HEADERS => [
+					'X-Custom-Header' => 'Foo',
+				],
+
+				Connection::OPTION_BASE_URI => 'http://api.nimbly.io/v1/'
+			]
+		);
 
 		$request = $connection->buildRequest('get', 'test/1');
 
@@ -49,11 +59,14 @@ class ConnectionOptionsTest extends BaseTestCase
 
 	public function test_option_default_query_params()
 	{
-		$connection = new Connection([
-			Connection::OPTION_DEFAULT_QUERY_PARAMS => [
-				'username' => 'foo',
-				'key' => 'bar',
-				]
+		$connection = new Connection(
+			$this->buildMockClient(),
+			[
+				Connection::OPTION_DEFAULT_QUERY_PARAMS => [
+					'username' => 'foo',
+					'key' => 'bar',
+				],
+				Connection::OPTION_BASE_URI => 'http://api.nimbly.io/v1/'
 			]
 		);
 
@@ -65,9 +78,13 @@ class ConnectionOptionsTest extends BaseTestCase
 
 	public function test_option_default_content_type()
 	{
-		$connection = new Connection([
-			Connection::OPTION_DEFAULT_CONTENT_TYPE => Connection::CONTENT_TYPE_XML,
-		]);
+		$connection = new Connection(
+			$this->buildMockClient(),
+			[
+				Connection::OPTION_DEFAULT_CONTENT_TYPE => Connection::CONTENT_TYPE_XML,
+				Connection::OPTION_BASE_URI => 'http://api.nimbly.io/v1/'
+			]
+		);
 
 		$request = $connection->buildRequest('post', 'test', [], 'foo');
 
@@ -76,13 +93,18 @@ class ConnectionOptionsTest extends BaseTestCase
 
 	public function test_option_response_class()
 	{
-	    $responses = [
-	        new Response(200),
-        ];
+	    ConnectionManager::add(
+			new Connection(
+				$this->buildMockClient([
+					new Response(200)
+				]),
 
-	    ConnectionManager::add('default', new Connection([
-	        Connection::OPTION_RESPONSE_CLASS => '\\Tests\\Models\\CustomResponseClass',
-        ], $this->buildMockClient($responses)));
+				[
+					Connection::OPTION_RESPONSE_CLASS => '\\Tests\\Models\\CustomResponseClass',
+					Connection::OPTION_BASE_URI => 'http://api.nimbly.io/v1/'
+				]
+			)
+		);
 
 	    $response = Users::find(1);
 
@@ -91,13 +113,17 @@ class ConnectionOptionsTest extends BaseTestCase
 
 	public function test_option_log()
 	{
-		$responses = [
-			new Response(200),
-		];
-
-		ConnectionManager::add('default', new Connection([
-			Connection::OPTION_LOG => true,
-		], $this->buildMockClient($responses)));
+		ConnectionManager::add(
+			new Connection(
+				$this->buildMockClient([
+					new Response(200)
+				]),
+				[
+					Connection::OPTION_LOG => true,
+					Connection::OPTION_BASE_URI => 'http://api.nimbly.io/v1/'
+				]
+			)
+		);
 
 		$blogs = Blogs::find(1);
 

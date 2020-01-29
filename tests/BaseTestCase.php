@@ -1,27 +1,26 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 5/18/17
- * Time: 2:09 PM
- */
 
 namespace Tests;
 
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
+use Capsule\Response;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\ClientInterface;
+use Shuttle\Handler\MockHandler;
+use Shuttle\Shuttle;
 
 class BaseTestCase extends TestCase
 {
-
-	protected function buildMockClient(array $responses)
+	/**
+	 * Build the HTTP client with a MockerHandler.
+	 *
+	 * @param array<Response> $responses
+	 * @return ClientInterface
+	 */
+	protected function buildMockClient(array $responses = []): ClientInterface
 	{
-		return new Client([
-			'handler' => HandlerStack::create(new MockHandler($responses))
+		return new Shuttle([
+			'handler' => new MockHandler($responses)
 		]);
 	}
-
 }

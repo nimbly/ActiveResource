@@ -5,7 +5,7 @@ namespace Tests;
 use ActiveResource\Collection;
 use ActiveResource\Connection;
 use ActiveResource\ConnectionManager;
-use GuzzleHttp\Psr7\Response;
+use Capsule\Response;
 use Tests\Models\Blogs;
 use Tests\Models\Users;
 
@@ -14,7 +14,7 @@ class GetTest extends BaseTestCase
 	public function test_get()
 	{
 		$responses = [
-			new Response(200, [], json_encode([
+			new Response(200, json_encode([
 				'id' => 7,
 				'title' => 'Blog Post',
 				'created_at' => '2017-01-28 03:45:00',
@@ -49,7 +49,14 @@ class GetTest extends BaseTestCase
 			])),
 		];
 
-		ConnectionManager::add('default', new Connection([], $this->buildMockClient($responses)));
+		ConnectionManager::add(
+			new Connection(
+				$this->buildMockClient($responses),
+				[
+					Connection::OPTION_BASE_URI => 'http://api.nimbly.io/v1/',
+				]
+			)
+		);
 
 		$blog = Blogs::find(1);
 

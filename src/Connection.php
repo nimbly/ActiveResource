@@ -2,21 +2,34 @@
 
 namespace ActiveResource;
 
-
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\BadResponseException;
-use GuzzleHttp\Exception\ConnectException;
-use Optimus\Onion\Onion;
+use Capsule\Request;
+use Capsule\Uri;
+use Closure;
+use Psr\Http\Client\ClientInterface;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
 class Connection
 {
-    /** @var Client */
-    protected $httpClient = null;
+    /**
+     * PSR-18 HTTP client instance.
+     *
+     * @var ClientInterface
+     */
+    protected $httpClient;
 
-    /** @var  Onion */
-    protected $middlewareManager;
+    /**
+     * Middleware manager.
+     *
+     * @var ?callable
+     */
+    protected $middlewarePipeline;
 
-    /** @var array  */
+    /**
+     * Request/response log.
+     *
+     * @var array<Log>
+     */
     protected $log = [];
 
     /**
@@ -86,7 +99,7 @@ class Connection
     const OPTION_UPDATE_DIFF = 'updateDiff';
 
     /**
-     * Array of class names to apply before each request is sent.
+     * Array of Middleware class names (not instances) to apply before each request is sent.
      *
      * Type: array
      * Default: []
@@ -94,12 +107,38 @@ class Connection
     const OPTION_MIDDLEWARE = 'middleware';
 
     /**
-     * Keep a log of all calls made
+     * Keep a log of all calls made.
      *
      * Type: boolean
      * Default: false
      */
     const OPTION_LOG = 'log';
+
+    /**
+     * HTTP protocol version to use for all calls.
+     * 
+     * Type: string
+     * Default: 1.1
+     */
+    const OPTION_HTTP_VERSION = 'httpVersion';
+
+    /**
+     * 
+     * Throw exception on 4xx response codes.
+     * 
+     * Type: boolean
+     * Default: false
+     * 
+     */
+    const OPTION_THROW_4xx = 'throw4xx';
+
+    /**
+     * Throw exception on 5xx response codes.
+     * 
+     * Type: boolean
+     * Default: false
+     */
+    const OPTION_THROW_5xx = 'throw5xx';
 
 	/**
 	 * Common API content types
@@ -108,8 +147,11 @@ class Connection
 	const CONTENT_TYPE_XML = 'application/xml';
 	const CONTENT_TYPE_FORM = 'application/x-www-form-urlencoded';
 
-
-    /** @var array  */
+    /**
+     * Connection options.
+     *
+     * @var array<string, mixed>
+     */
     protected $options = [
         self::OPTION_BASE_URI => null,
         self::OPTION_DEFAULT_HEADERS => [],
@@ -121,53 +163,52 @@ class Connection
         self::OPTION_UPDATE_DIFF => false,
         self::OPTION_MIDDLEWARE => [],
         self::OPTION_LOG => false,
+        self::OPTION_HTTP_VERSION => '1.1',
+        self::OPTION_THROW_4xx => false,
+        self::OPTION_THROW_5xx => false
     ];
 
-	/** @var Request */
+	/**
+     * Last Request object sent.
+     *
+     * @var RequestInterface
+     */
 	protected $request;
 
-	/** @var ResponseAbstract */
+	/**
+     * Last Response object received.
+     *
+     * @var ResponseInterface
+     */
 	protected $response;
 
     /**
      * Connection constructor.
-     * @param Client $httpClient
-     * @param array $options
+     * 
+     * @param ClientInterface $httpClient
+     * @param array<string, mixed> $options
      */
-    public function __construct(array $options = [], Client $httpClient = null)
+    public function __construct(ClientInterface $httpClient, array $options = [])
     {
+        $this->httpClient = $httpClient;
+
         if( $options ){
             foreach( $options as $option => $value ){
                 $this->setOption($option, $value);
             }
         }
-
-        if( !empty($httpClient) ){
-            $this->setHttpClient($httpClient);
-        }
-    }
-
-    /**
-     * Set the HTTP client for this connection
-     *
-     * @param Client $httpClient
-     */
-    public function setHttpClient(Client $httpClient)
-    {
-        $this->httpClient = $httpClient;
     }
 
     /**
      * Set an option
      *
-     * @param $name
-     * @param $value
-     *
+     * @param string $name
+     * @param mixed $value
      * @return Connection
      */
-    public function setOption($name, $value)
+    public function setOption(string $name, $value): Connection
     {
-        if( array_key_exists($name, $this->options) ){
+        if( \array_key_exists($name, $this->options) ){
             $this->options[$name] = $value;
         }
 
@@ -175,46 +216,55 @@ class Connection
     }
 
     /**
-     * Get an option
+     * Get a connection option value.
      *
-     * @param $name
+     * @param string $name
      * @return mixed|null
      */
-    public function getOption($name)
+    public function getOption(string $name)
     {
-        if( array_key_exists($name, $this->options) ){
-            return $this->options[$name];
-        }
-
-        return null;
+        return $this->options[$name] ?? null;
     }
 
     /**
-     * Set this connection to use the Basic authorization schema by providing the username and password.
+     * Does connection have given option set?
      *
-     * @param $username
-     * @param $password
-     * @return $this
+     * @param string $name
+     * @return boolean
      */
-    public function useBasicAuthorization($username, $password)
+    public function hasOption(string $name): bool
     {
-        $this->options[self::OPTION_DEFAULT_HEADERS] = array_merge(
+        return isset($this->options[$name]);
+    }
+
+    /**
+     * Set this connection to use the Basic authorization scheme
+     * by providing the username and password.
+     *
+     * @param ?string $username
+     * @param ?string $password
+     * @return Connection
+     */
+    public function useBasicAuthorization(?string $username, ?string $password): Connection
+    {
+        $this->options[self::OPTION_DEFAULT_HEADERS] = \array_merge(
             $this->options[self::OPTION_DEFAULT_HEADERS],
-            ['Authorization' => 'Basic '.base64_encode("{$username}:{$password}")]
+            ['Authorization' => 'Basic ' . \base64_encode("{$username}:{$password}")]
         );
 
         return $this;
     }
 
     /**
-     * Set this connection to use the Bearer authorization schema by providing the bearer token.
+     * Set this connection to use the Bearer authorization scheme
+     * by providing the bearer token.
      *
-     * @param $token
-     * @return $this
+     * @param string $token
+     * @return Connection
      */
-    public function useBearerAuthorization($token)
+    public function useBearerAuthorization(string $token): Connection
     {
-        $this->options[self::OPTION_DEFAULT_HEADERS] = array_merge(
+        $this->options[self::OPTION_DEFAULT_HEADERS] = \array_merge(
             $this->options[self::OPTION_DEFAULT_HEADERS],
             ['Authorization' => "Bearer {$token}"]
         );
@@ -223,41 +273,42 @@ class Connection
     }
 
     /**
-     * Build an ActiveResource Request object instance using the connection's options.
+     * Builds a PSR-7 Request instance.
      *
-     * This Request object will be passed through the middleware layers.
-     *
-     * @param string $method HTTP method (get, post, put, delete, etc.)
-     * @param string $url
-     * @param array $queryParams Associative array of key=>value pairs to add to URL query
-     * @param string|null $body The body to send in the request
-     * @param array $headers Associative array of key=>value pairs to add to headers
-     * @return Request
+     * @param string $method
+     * @param string $uri
+     * @param array<string, string>|null $queryParams
+     * @param string|null $body
+     * @param array<string, string>|null $headers
+     * @return RequestInterface
      */
-    public function buildRequest($method, $url, array $queryParams = [], $body = null, array $headers = [])
+    public function buildRequest(string $method, string $uri, ?array $queryParams, ?string $body, ?array $headers): RequestInterface
     {
-        $request = new Request;
+        $uri = new Uri(
+            $this->getOption(self::OPTION_BASE_URI) . $uri
+        );
 
-        // Set the request method
-        $request->setMethod(strtoupper($method));
+        $uri = $uri->withQuery(
+            \http_build_query(
+                \array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS) ?? [], $queryParams ?? [])
+            )
+        );
 
-        // Set the URI
-        $request->setUrl($this->getOption(self::OPTION_BASE_URI) . $url);
+        $request = new Request(
+            $method,
+            $uri,
+            $body,
+            \array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS) ?? [], $headers ?? []),
+            $this->getOption(self::OPTION_HTTP_VERSION)
+        );
 
-        // Set the query params
-        $request->setQueries(array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS), $queryParams));
-
-        // Set the request body
-        $request->setBody($body);
-
-        // Set the headers
-        $request->setHeaders(array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS), $headers));
-
-        // Check for Content-Type header and set it
-        if( in_array($request->getMethod(), ['POST','PUT','PATCH']) &&
-            $request->getHeader('Content-Type') === null &&
-            ($contentType = $this->getOption(self::OPTION_DEFAULT_CONTENT_TYPE)) ){
-            $request->setHeader('Content-Type', $contentType);
+        if( \in_array($request->getMethod(), ['POST','PUT','PATCH']) &&
+            $request->hasHeader('Content-Type') === false &&
+            $this->hasOption(self::OPTION_DEFAULT_CONTENT_TYPE) ){
+            $request = $request->withHeader(
+                'Content-Type',
+                $this->getOption(self::OPTION_DEFAULT_CONTENT_TYPE)
+            );
         }
 
         return $request;
@@ -266,40 +317,29 @@ class Connection
     /**
      * Make the HTTP call
      *
-     * @param Request $request
-     * @throws ConnectException
-     * @return ResponseAbstract
+     * @param RequestInterface $request
+     * @return ResponseInterface
      */
-    public function send(Request $request)
+    public function send(RequestInterface $request): ResponseInterface
     {
-        // Initialize middleware manager
-        $this->initializeMiddlewareManager();
-
-        // Lazy load the the HttpClient
-        if( empty($this->httpClient) ){
-            $this->setHttpClient(new Client);
-        }
-
         // Get the response class name to instantiate (to pass into Middleware)
         $responseClass = $this->getOption(self::OPTION_RESPONSE_CLASS);
 
-		// Capture start time (for logging requests)
-        $start = microtime(true);
-
         // Save the request object so it may be retrieved
-		$this->request = $request;
+        $this->request = $request;
+        
+        // Capture start time (for logging requests)
+        $start = \microtime(true);
 
 		// Run the request
-        /** @var ResponseAbstract $response */
-        $response = $this->middlewareManager->peel($request, function(Request $request) use ($responseClass) {
-            try {
-                $response = $this->httpClient->send($request->newPsr7Request());
-            } catch( BadResponseException $badResponseException ){
-                $response = $badResponseException->getResponse();
-            }
+        $response = $this->run(
+            $request,
+            function(RequestInterface $request) use ($responseClass): ResponseInterface {
 
-            return new $responseClass($response);
-        });
+                return $this->httpClient->sendRequest($request);
+
+            }
+        );
 
         // Capture end time
         $stop = microtime(true);
@@ -309,70 +349,117 @@ class Connection
 
         // Should we log this request?
         if( $this->getOption(self::OPTION_LOG) ){
-            $this->addLog($request, $response, ($stop-$start));
+            $this->addLog($request, $response, (int) \round(($stop-$start) * 1000));
+        }
+
+        if( $this->shouldThrow($response) ){
+            throw new ResponseException($response);
         }
 
         return $response;
     }
 
     /**
-     * @return array
+     * Run the request through the Middleware pipeline.
+     *
+     * @param RequestInterface $request
+     * @param callable $kernel
+     * @return ResponseInterface
      */
-    public function getLog()
+    private function run(RequestInterface $request, callable $kernel): ResponseInterface
+    {
+        if( empty($this->middlewarePipeline) ){
+            $this->middlewarePipeline = $this->compileMiddleware(
+                $this->getOption(self::OPTION_MIDDLEWARE),
+                $kernel
+            );
+        }
+
+        return \call_user_func($this->middlewarePipeline, $request);
+    }
+
+    /**
+     * Compile the middleware pipeline.
+     *
+     * @param array<MiddlewareInterface|string> $middleware
+     * @return Closure
+     */
+    private function compileMiddleware(array $middleware, callable $kernel): Closure
+    {
+        $middlewareStack = [];
+        foreach( \array_reverse($middleware) as $layer ){
+            $middlewareStack[] = new $layer;
+        }
+
+        return \array_reduce($middlewareStack, function(callable $next, object $middleware): Closure {
+
+            return function(RequestInterface $request) use ($next, $middleware): ResponseInterface {
+                return $middleware->handle($request, $next);
+            };
+
+        }, function(RequestInterface $request) use ($kernel): ResponseInterface {
+            return $kernel($request);
+        });
+    }
+
+    /**
+     * Should an exception be thrown for the given Response.
+     *
+     * @param ResponseInterface $response
+     * @return boolean
+     */
+    private function shouldThrow(ResponseInterface $response): bool
+    {
+        if( ($response->getStatusCode() >= 400 && $response->getStatusCode() < 500 &&
+            $this->getOption(self::OPTION_THROW_4xx)) ||
+            
+            ($response->getStatusCode() >= 500 &&
+            $this->getOption(self::OPTION_THROW_5xx)) ){
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Add an entry into the Request/Response log.
+     * 
+     * @param RequestInterface $request
+     * @param ResponseInterface $response
+     * @param int $time
+     * @return void
+     */
+    private function addLog(RequestInterface $request, ResponseInterface $response, int $time): void
+    {
+        $this->log[] = new Log($request, $response, $time);
+    }
+
+    /**
+     * Get the Request/Response log.
+     * 
+     * @return array<Log>
+     */
+    public function getLog(): array
     {
         return $this->log;
     }
 
-    /**
-     * @param Request $request
-     * @param ResponseAbstract $response
-     * @param float $timing
-     */
-    private function addLog(Request $request, ResponseAbstract $response, $timing)
-    {
-        $this->log[] = [
-            'request' => $request,
-            'response' => $response,
-            'time' => $timing,
-        ];
-    }
-
-    /**
-     * Initialize middleware manager by instantiating all middlware classes
-     * and creating Onion instance.
-     *
-     * @return void
-     */
-    private function initializeMiddlewareManager()
-    {
-        if( empty($this->middlewareManager) ){
-
-            $layers = [];
-            foreach( $this->getOption(self::OPTION_MIDDLEWARE) as $middleware ){
-                $layers[] = new $middleware;
-            }
-
-            // Create new Onion
-            $this->middlewareManager = new Onion($layers);
-        }
-    }
-
 	/**
-	 * Get the last Request object
+	 * Get the last Request object.
 	 *
-	 * @return \ActiveResource\Request
+	 * @return RequestInterface
 	 */
-    public function getLastRequest()
+    public function getLastRequest(): RequestInterface
 	{
 		return $this->request;
 	}
 
 	/**
-	 * Get the last Response object
+	 * Get the last Response object.
 	 *
-	 * @return ResponseAbstract
+	 * @return ResponseInterface
 	 */
-	public function getLastResponse()
+	public function getLastResponse(): ResponseInterface
 	{
 		return $this->response;
 	}

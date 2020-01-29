@@ -1,0 +1,89 @@
+/home/brent/Projects/nimbly/ActiveResource/src/ActiveResourceResponseException.php:8:15:warning - MissingPropertyType: Property ActiveResource\ActiveResourceResponseException::$response does not have a declared type - consider null|ActiveResource\ResponseAbstract
+/home/brent/Projects/nimbly/ActiveResource/src/ActiveResourceResponseException.php:17:21:warning - MissingReturnType: Method ActiveResource\ActiveResourceResponseException::getResponse does not have a return type
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:28:21:warning - MissingReturnType: Method ActiveResource\Collection::first does not have a return type
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:37:21:warning - MissingReturnType: Method ActiveResource\Collection::toArray does not have a return type, expecting array<int, array<array-key, mixed>>
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:41:17:warning - RedundantConditionGivenDocblockType: Found a redundant condition when evaluating docblock-defined type $object and trying to reconcile type 'ActiveResource\Model' to ActiveResource\Model
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:49:21:warning - MissingReturnType: Method ActiveResource\Collection::toJson does not have a return type, expecting string|false
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:54:21:warning - MissingReturnType: Method ActiveResource\Collection::current does not have a return type, expecting ActiveResource\Model
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:59:21:warning - MissingReturnType: Method ActiveResource\Collection::seek does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:59:26:warning - MissingParamType: Parameter $position has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:68:21:warning - MissingReturnType: Method ActiveResource\Collection::next does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:73:21:warning - MissingReturnType: Method ActiveResource\Collection::rewind does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:83:21:warning - MissingReturnType: Method ActiveResource\Collection::valid does not have a return type, expecting bool
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:88:21:warning - MissingReturnType: Method ActiveResource\Collection::key does not have a return type, expecting int
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:105:13:warning - RedundantConditionGivenDocblockType: Found a redundant condition when evaluating docblock-defined type $offset and trying to reconcile type 'TKey as mixed' to !falsy
+/home/brent/Projects/nimbly/ActiveResource/src/Collection.php:105:13:warning - RedundantConditionGivenDocblockType: Found a redundant condition when evaluating docblock-defined type $offset and trying to reconcile type 'TKey as mixed' to falsy
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:14:29:error - PossiblyNullPropertyAssignmentValue: $this->httpClient with non-nullable declared type 'GuzzleHttp\Client' cannot be assigned nullable type 'null'
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:17:15:warning - PropertyNotSetInConstructor: Property ActiveResource\Connection::$middlewareManager is not defined in constructor of ActiveResource\Connection or in any private methods called in the constructor
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:127:12:warning - PropertyNotSetInConstructor: Property ActiveResource\Connection::$request is not defined in constructor of ActiveResource\Connection or in any private methods called in the constructor
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:130:12:warning - PropertyNotSetInConstructor: Property ActiveResource\Connection::$response is not defined in constructor of ActiveResource\Connection or in any private methods called in the constructor
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:155:21:warning - MissingReturnType: Method ActiveResource\Connection::setHttpClient does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:168:31:warning - MissingParamType: Parameter $name has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:168:38:warning - MissingParamType: Parameter $value has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:183:31:warning - MissingParamType: Parameter $name has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:199:43:warning - MissingParamType: Parameter $username has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:199:54:warning - MissingParamType: Parameter $password has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:215:44:warning - MissingParamType: Parameter $token has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:251:27:error - PossiblyNullArgument: Argument 1 of ActiveResource\Request::setBody cannot be null, possibly null value provided
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:279:13:warning - DocblockTypeContradiction: Found a contradiction with a docblock-defined type when evaluating $this->httpClient and trying to reconcile type 'GuzzleHttp\Client' to empty
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:294:62:warning - MissingClosureReturnType: Closure does not have a return type, expecting object
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:331:22:warning - MissingReturnType: Method ActiveResource\Connection::addLog does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:348:13:warning - DocblockTypeContradiction: Found a contradiction with a docblock-defined type when evaluating $this->middlewareManager and trying to reconcile type 'Optimus\Onion\Onion' to empty
+/home/brent/Projects/nimbly/ActiveResource/src/Connection.php:351:22:error - PossiblyNullIterator: Cannot iterate over nullable var mixed|null
+/home/brent/Projects/nimbly/ActiveResource/src/ConnectionManager.php:19:28:warning - MissingReturnType: Method ActiveResource\ConnectionManager::add does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:20:31:error - PossiblyNullPropertyAssignmentValue: $this->resourceName with non-nullable declared type 'string' cannot be assigned nullable type 'null'
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:75:25:error - PossiblyInvalidArgument: Argument 1 of ActiveResource\Model::fill expects array<array-key, mixed>, possibly different type non-empty-array<array-key, mixed>|object provided
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:112:15:error - PossiblyNullOperand: Cannot concatenate with a possibly null null|string
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:208:21:warning - MissingReturnType: Method ActiveResource\Model::fill does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:244:41:warning - MissingParamType: Parameter $data has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:252:26:warning - InvalidStringClass: String cannot be used as a class
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:311:27:warning - MissingParamType: Parameter $property has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:330:27:warning - MissingParamType: Parameter $property has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:330:38:warning - MissingParamType: Parameter $value has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:348:30:warning - MissingParamType: Parameter $property has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:421:43:warning - MissingParamType: Parameter $data has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:462:24:warning - MissingReturnType: Method ActiveResource\Model::encode does not have a return type, expecting string|false
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:462:31:warning - MissingParamType: Parameter $data has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:522:16:error - InvalidReturnType: The declared return type 'int' for ActiveResource\Model::isModified is incorrect, got 'bool'
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:526:9:error - InvalidReturnStatement: The type 'bool' does not match the declared return type 'int' for ActiveResource\Model::isModified
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:547:34:warning - MissingParamType: Parameter $payload has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:560:33:warning - MissingParamType: Parameter $payload has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:584:13:warning - RedundantConditionGivenDocblockType: Found a redundant condition when evaluating docblock-defined type $data and trying to reconcile type 'object' to object
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:609:21:warning - MissingReturnType: Method ActiveResource\Model::setResourceIdentifier does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:609:43:warning - MissingParamType: Parameter $value has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:697:35:warning - MissingParamType: Parameter $id has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Model.php:819:24:warning - InvalidStringClass: String cannot be used as a class
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:37:25:error - PossiblyNullPropertyAssignmentValue: $this->method with non-nullable declared type 'string' cannot be assigned nullable type 'string|null'
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:38:22:error - PossiblyNullPropertyAssignmentValue: $this->url with non-nullable declared type 'string' cannot be assigned nullable type 'string|null'
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:41:23:error - PossiblyNullPropertyAssignmentValue: $this->body with non-nullable declared type 'string' cannot be assigned nullable type 'string|null'
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:59:21:warning - MissingReturnType: Method ActiveResource\Request::setMethod does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:79:21:warning - MissingReturnType: Method ActiveResource\Request::setUrl does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:99:21:warning - MissingReturnType: Method ActiveResource\Request::setQueries does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:110:30:warning - MissingParamType: Parameter $name has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:113:20:error - PossiblyInvalidArrayOffset: Cannot access value on variable $this->query using a string|int|true offset, expecting array-key
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:125:21:warning - MissingReturnType: Method ActiveResource\Request::setQuery does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:125:30:warning - MissingParamType: Parameter $name has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:125:37:warning - MissingParamType: Parameter $value has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:161:21:warning - MissingReturnType: Method ActiveResource\Request::setHeaders does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:172:31:warning - MissingParamType: Parameter $name has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:175:20:error - PossiblyInvalidArrayOffset: Cannot access value on variable $this->headers using a string|int|true offset, expecting array-key
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:187:21:warning - MissingReturnType: Method ActiveResource\Request::setHeader does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:190:13:error - InvalidPropertyAssignmentValue: $this->headers with declared type 'array<array-key, mixed>' cannot be assigned type 'non-empty-array<array-key|true, mixed|string>'
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:204:34:warning - MissingParamType: Parameter $name has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:207:19:error - PossiblyInvalidArrayOffset: Cannot access value on variable $this->headers using a string|int|true offset, expecting array-key
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:229:21:warning - MissingReturnType: Method ActiveResource\Request::setBody does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:235:23:error - PossiblyNullPropertyAssignmentValue: $this->body with non-nullable declared type 'string' cannot be assigned nullable type 'string|null'
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:246:39:warning - MissingParamType: Parameter $key has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/Request.php:268:24:error - PossiblyNullOperand: Cannot concatenate with a possibly null null|string
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:15:15:warning - PropertyNotSetInConstructor: Property ActiveResource\ResponseAbstract::$statusCode is not defined in constructor of ActiveResource\Response or in any private methods called in the constructor
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:15:15:warning - PropertyNotSetInConstructor: Property ActiveResource\ResponseAbstract::$statusCode is not defined in constructor of ActiveResource\ResponseAbstract or in any private methods called in the constructor
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:138:21:warning - MissingReturnType: Method ActiveResource\ResponseAbstract::setStatusCode does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:138:35:warning - MissingParamType: Parameter $statusCode has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:154:9:error - NullableReturnStatement: The declared return type 'string' for ActiveResource\ResponseAbstract::getStatusPhrase is not nullable, but the function returns 'null'
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:173:31:warning - MissingParamType: Parameter $name has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:189:21:warning - MissingReturnType: Method ActiveResource\ResponseAbstract::setHeader does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:189:31:warning - MissingParamType: Parameter $header has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:189:40:warning - MissingParamType: Parameter $value has no provided type
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:198:21:warning - MissingReturnType: Method ActiveResource\ResponseAbstract::setHeaders does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:225:21:warning - MissingReturnType: Method ActiveResource\ResponseAbstract::setBody does not have a return type, expecting void
+/home/brent/Projects/nimbly/ActiveResource/src/ResponseAbstract.php:225:29:warning - MissingParamType: Parameter $body has no provided type

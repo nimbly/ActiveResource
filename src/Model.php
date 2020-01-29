@@ -2,27 +2,37 @@
 
 namespace ActiveResource;
 
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+
 
 abstract class Model
 {
     /**
-     * The unique/primary key field for the resource
+     * The primary key property for the resource.
+     * 
+     * Defaults to "id".
      *
-     * @var string $identifierName
+     * @var string
      */
     protected $identifierName = 'id';
 
     /**
-     * The name of the resource URI - defaults to the lowercase name of the Model class
+     * The name of the resource URI.
+     * 
+     * Defaults to the lowercase name of the Model class
+     * 
+     * For example, if the resource endpoint is "books", name the class Books or
+     * set this property on the class to "books."
      *
-     * @var string $resourceName
+     * @var string
      */
-    protected $resourceName = null;
+    protected $resourceName;
 
     /**
      * The connection name to use for this resource
      *
-     * @var string $connectionName
+     * @var string
      */
     protected $connectionName = 'default';
 
@@ -31,45 +41,62 @@ abstract class Model
      *
      * When set to null or empty array, all properties are writeable.
      *
-     * @var null|array
+     * @var array<string>|null
      */
-    protected $readOnlyProperties = null;
+    protected $readOnlyProperties;
 
     /**
      * When set to array of property names, only these properties are allowed to be mass assigned when calling the fill() method.
      *
      * If null, *all* properties can be mass assigned.
      *
-     * @var null|array
+     * @var array<string>|null
      */
-    protected $fillableProperties = null;
+    protected $fillableProperties;
 
     /**
      * Array of property names that are excluded when saving/updating model to API.
      *
      * If null or empty array, all properties will be sent when saving model.
      *
-     * @var null|array
+     * @var array<string>|null
      */
-    protected $excludedProperties = null;
-    
-    /** @var string|integer|null $resourceIdentifier */
-    private $resourceIdentifier = null;
+    protected $excludedProperties;
 
-    /** @var array $properties */
+    /**
+     * Resource Identifier
+     *
+     * @var mixed
+     */
+    private $resourceIdentifier;
+
+    /**
+     * Model properties (attributes)
+     *
+     * @var array<string, mixed>
+     */
     private $properties = [];
 
-    /** @var array $modifiedProperties */
+    /**
+     * Modified model properties (attributes)
+     *
+     * @var array<string, mixed>
+     */
     private $modifiedProperties = [];
 
-    /** @var array $dependentResources */
+    /**
+     * Dependent resources
+     *
+     * @var array
+     */
     private $dependentResources = [];
 
     /**
      * Model constructor.
-     * @param array|object|null $data
+     * 
+     * @param array<string, mixed> $data
      */
-    public function __construct($data = null)
+    public function __construct(array $data = [])
     {
         if( !empty($data) ){
             $this->fill($data);
@@ -77,11 +104,11 @@ abstract class Model
     }
 
     /**
-     * Get the ID of the resource
+     * Get the value of the primary key/ID.
      *
      * @return mixed|null
      */
-    public function getId()
+    protected function getIdentifierValue()
     {
         return $this->{$this->identifierName};
     }
@@ -91,17 +118,52 @@ abstract class Model
      *
      * @return string
      */
-    public function getIdentifierName()
+    protected function getIdentifierName(): string
     {
         return $this->identifierName;
     }
 
     /**
-     * Get the full resource URI
+     * Manually set the resource identifier on the model instance.
+     *
+     * This property is used to inform the model whether the object was retrieved via the API vs a manually hydrated
+     * object instance.
+     *
+     * @param $value
+     * @return void
+     */
+    public function setResourceIdentifier($value): void
+    {
+        $this->resourceIdentifier = $value;
+    }
+
+    /**
+     * Get the model's resource name (defaults to lowercase class name)
      *
      * @return string
      */
-    public function getResourceUri()
+    public function getResourceName()
+    {
+        if( empty($this->resourceName) ){
+
+            $resourceName = get_called_class();
+
+            if( ($pos = strrpos($resourceName, '\\')) !== false ) {
+                $resourceName = substr($resourceName, $pos + 1);
+            }
+
+            $this->resourceName = strtolower($resourceName);
+        }
+
+        return $this->resourceName;
+    }
+
+    /**
+     * Get the full resource URI of this instance.
+     *
+     * @return string
+     */
+    protected function getResourceUri(): string
     {
         $uri = '';
 
@@ -111,7 +173,7 @@ abstract class Model
 
         $uri.=$this->getResourceName();
 
-        if( ($id = $this->getId()) ){
+        if( ($id = $this->getIdentifierValue()) ){
             $uri.="/{$id}";
         }
 
@@ -119,20 +181,22 @@ abstract class Model
     }
 
     /**
-     * Save the entity
+     * Save the resource.
      *
      * @param array $queryParams
      * @param array $headers
-     *
      * @return bool
      */
-    public function save(array $queryParams = [], array $headers = [])
+    public function save(array $queryParams = [], array $headers = []): bool
     {
-        // By default, submit all data
+        // Get the connection to use for this Model
+        $connection = ConnectionManager::get($this->connectionName);
+
+        // By default, submit all data.
         $data = array_merge($this->properties, $this->modifiedProperties);
 
-        // No id, new (POST) resource instance
-        if( $this->{$this->identifierName} == false ){
+        // No id, new (POST) resource instance.
+        if( empty($this->getIdentifierValue()) ){
             $method = 'post';
         }
 
@@ -140,12 +204,12 @@ abstract class Model
         else {
 
             // Can we just send the modified properties? (i.e. a PATCH)
-            if( $this->getConnection()->getOption(Connection::OPTION_UPDATE_DIFF) ){
+            if( $connection->getOption(Connection::OPTION_UPDATE_DIFF) ){
                 $data = $this->modifiedProperties;
             }
 
             // Get the update method (usually either PUT or PATCH)
-            $method = $this->getConnection()->getOption(Connection::OPTION_UPDATE_METHOD);
+            $method = $connection->getOption(Connection::OPTION_UPDATE_METHOD);
         }
 
         // Filter out excluded properties
@@ -153,59 +217,56 @@ abstract class Model
             $data = array_diff($data, $this->excludedProperties);
         }
 
-        // Build request object
-        $request = $this->getConnection()->buildRequest($method, $this->getResourceUri(), $queryParams, $this->encode($data), $headers);
+        // Make request
+        $response = $connection->send(
+            $connection->buildRequest($method, $this->getResourceUri(), $queryParams, $this->serialize($data), $headers)
+        );
 
-        // Do the update
-        $response = $this->getConnection()->send($request);
         if( $response->isSuccessful() ){
-            $this->hydrate($this->parseFind($response->getPayload()));
+
+            $this->hydrate(
+                $this->parseFind(
+                    $this->deserialize($response->getBody()->getContents())
+                )
+            );
+
             $this->modifiedProperties = [];
             return true;
-        }
-
-        // Should we throw an exception?
-        if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($response);
         }
 
         return false;
     }
 
     /**
-     * Destroy (delete) the resource
+     * Destroy (delete) the resource.
      *
      * @param array $queryParams
      * @param array $headers
      *
      * @return bool
      */
-    public function destroy(array $queryParams = [], array $headers = [])
+    public function destroy(array $queryParams = [], array $headers = []): bool
     {
-        // Build request
-        $request = $this->getConnection()->buildRequest('delete', $this->getResourceUri(), $queryParams, null, $headers);
+        // Get the connection for this model.
+        $connection = ConnectionManager::get($this->connectionName);
 
-        // Get response
-        $response = $this->getConnection()->send($request);
-        if( $response->isSuccessful() ){
+        $response = $connection->send(
+            $connection->buildRequest('delete', $this->getResourceUri(), $queryParams, null, $headers)
+        );
+
+        if( $this->isResponseSuccessful($response) ){
             return true;
-        }
-
-        // Throw if needed
-        if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($response);
         }
 
         return false;
     }
 
-
     /**
-     * Mass assign properties with an array of key/value pairs
+     * Mass assign properties with an array of key/value pairs.
      *
-     * @param array $data
+     * @param array<string, mixed> $data
      */
-    public function fill(array $data)
+    public function fill(array $data): void
     {
         foreach( $data as $property => $value ){
             if( is_array($this->fillableProperties) &&
@@ -220,28 +281,23 @@ abstract class Model
     /**
      * Build a Collection of included resources in response payload.
      *
-     * @param string $model
+     * @param string $modelClass
      * @param array $data
-     *
-     * @return array|mixed
+     * @return array<Model>
      */
-    public function includesMany($model, array $data)
+    public function includesMany(string $modelClass, array $data)
     {
-        if( empty($data) ){
-            return $this->buildCollection($model, []);
-        }
-
-        return $this->buildCollection($model, $data);
+        return $this->buildCollection($modelClass, $data);
     }
 
     /**
      * Build a single instance of an included resource in response payload.
      *
-     * @param string $model
-     * @param $data
+     * @param string $modelClass
+     * @param mixed $data
      * @return Model
      */
-    public function includesOne($model, $data)
+    public function includesOne(string $modelClass, $data): Model
     {
         if( empty($data) ||
             (!is_object($data) && !is_array($data)) ){
@@ -249,8 +305,8 @@ abstract class Model
         }
 
         /** @var Model $modelInstance */
-        $modelInstance = new $model;
-        $modelInstance->hydrate($data);
+        $modelInstance = new $modelClass;
+        $modelInstance->hydrate((array) $data);
 
         /** @var self $instance */
         return $modelInstance;
@@ -277,12 +333,11 @@ abstract class Model
      * $comment->save();
      *
      * @param Model|string $resource
-	 *
 	 * @return Model
      */
-    public function through($resource)
+    public function through($resource): Model
     {
-        if( $resource instanceof Model ){
+        if( $resource instanceof static ){
 
             if( !in_array($resource->getResourceUri(), $this->dependentResources) ){
                 $this->dependentResources[] = $resource->getResourceUri();
@@ -290,7 +345,7 @@ abstract class Model
             
         }
 
-        else{
+        else {
 
             if( !in_array($resource, $this->dependentResources) ){
                 $this->dependentResources[] = $resource;
@@ -303,7 +358,7 @@ abstract class Model
 
 
     /**
-     * Magic getter
+     * Get a model property.
      *
      * @param $property
      * @return mixed|null
@@ -322,16 +377,15 @@ abstract class Model
     }
 
     /**
-     * Magic setter
+     * Set a model property.
      *
-     * @param $property
-     * @param $value
+     * @param string $property
+     * @param mixed $value
      */
-    public function __set($property, $value)
+    public function __set(string $property, $value): void
     {
         // Is this a read only property?
-        if( is_array($this->readOnlyProperties) &&
-            in_array($property, $this->readOnlyProperties) ){
+        if( isset($this->readOnlyProperties[$property]) ){
             return;
         }
 
@@ -341,11 +395,10 @@ abstract class Model
     /**
      * Get the original value of a property (before it was modified).
      *
-     *
-     * @param $property
+     * @param string $property
      * @return mixed|null
      */
-    public function original($property)
+    public function original(string $property)
     {
         if( array_key_exists($property, $this->properties) ){
             return $this->properties[$property];
@@ -355,70 +408,78 @@ abstract class Model
     }
 
     /**
-     * Reset all modified properties
+     * Reset all modified properties.
      *
      * @return void
      */
-    public function reset()
+    public function reset(): void
     {
         $this->modifiedProperties = [];
     }
 
     /**
-     * Reset all data on model instance and reload from remote API.
+     * Reload instance from data source. Resets all modified properties.
      *
      * @param array $queryParams
      * @param array $headers
      * @return bool
      */
-    public function refresh(array $queryParams = [], array $headers = [])
+    public function refresh(array $queryParams = [], array $headers = []): bool
     {
-        // Build the request object
-        $request = $this->getConnection()->buildRequest('get', $this->getResourceUri(), $queryParams, null, $headers);
+        $connection = ConnectionManager::get($this->connectionName);
 
-        // Send the request
-        $response = $this->getConnection()->send($request);
+        $response = $connection->send(
+            $connection->buildRequest('get', $this->getResourceUri(), $queryParams, null, $headers)
+        );
+
         if( $response->isSuccessful() ) {
 
-            // Clear out all local properties and modified properties
             $this->properties = [];
             $this->modifiedProperties = [];
-
-            $this->hydrate($this->parseFind($response->getPayload()));
+            $this->hydrate(
+                $this->parseFind(
+                    $this->deserialize($response->getBody()->getContents())
+                )
+            );
             return true;
-        }
 
-        if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($response);
         }
 
         return false;
     }
 
     /**
+     * Convert the model into an array.
+     * 
      * @return array
      */
-    public function toArray()
+    public function toArray(): array
     {
-        $properties = array_merge($this->properties, $this->modifiedProperties);
-        return self::objectToArray($properties);
+        return self::objectToArray(
+            array_merge($this->properties, $this->modifiedProperties)
+        );
     }
 
     /**
+     * Conver the model into JSON.
+     * 
      * @return string
      */
-    public function toJson()
+    public function toJson(): string
     {
-        return json_encode($this->toArray(), JSON_UNESCAPED_SLASHES);
+        return \json_encode(
+            $this->toArray(),
+            JSON_UNESCAPED_SLASHES
+        );
     }
 
     /**
-     * Used to recursively convert model and relations into array
+     * Used to recursively convert model and relations into array.
      *
      * @param $data
      * @return array
      */
-    private static function objectToArray($data)
+    private static function objectToArray($data): array
     {
         $result = [];
 
@@ -430,7 +491,7 @@ abstract class Model
             }
             elseif( $value instanceof \StdClass )
             {
-                $result[$property] = (array)$value;
+                $result[$property] = (array) $value;
             }
             elseif( is_array($value) ||
                 $value instanceof \ArrayAccess )
@@ -446,71 +507,52 @@ abstract class Model
     }
 
 	/**
-	 * Default encode method for Request payloads. Need to send JSON or XML or something else?
-	 *
-	 * Gets called for all PUT/POST/PATCH calls to the API.
+	 * Default serialize method for Request payloads.
 	 *
 	 * You should override this method in your models (if necessary) or in a BaseModel class. This is also a good
 	 * place to add any extra markup needed in the request body. For example:
 	 *
 	 * return json_encode(['data' => $data]);
 	 *
-	 * @param string
-	 *
+	 * @param mixed $data
 	 * @return string
 	 */
-    protected function encode($data)
+    protected function serialize($data): string
 	{
-		return json_encode($data);
-	}
-
+		return \json_encode($data);
+    }
+    
     /**
-     * Get the model's resource name (defaults to lowercase class name)
+     * Default deserialize method for Response payloads.
+     * 
+     * You should override this method in your models or in a BaseModel class.
      *
-     * @return null|string
+     * @param string $data
+     * @return object
      */
-    public function getResourceName()
+    protected function deserialize(string $data): object
     {
-        if( empty($this->resourceName) ){
-
-            $resourceName = get_called_class();
-
-            if( ($pos = strrpos($resourceName, '\\')) !== false ) {
-                $resourceName = substr($resourceName, $pos + 1);
-            }
-
-            $this->resourceName = strtolower($resourceName);
-        }
-
-        return $this->resourceName;
+        return \json_decode($data);
     }
 
     /**
-     * Get the API connection for the model
+     * Get the Connection configured for the model.
      *
+     * @throws ActiveResourceException
      * @return Connection
      */
-    public function getConnection()
+    public function getConnection(): Connection
     {
         return ConnectionManager::get($this->connectionName);
     }
 
-	/**
-	 * Get the API connection for the model
-	 *
-	 * @return Connection
-	 */
-	public static function connection(){
-		return self::getCalledClassInstance()->getConnection();
-	}
-
     /**
      * Return an instance of the called class
      *
-     * @param null $constructorData
-     * @return self
+     * @param array|null $constructorData
+     * @return Model
      */
-    protected static function getCalledClassInstance($constructorData = null)
+    protected static function getModelInstance($constructorData = null)
     {
         $className = get_called_class();
         return new $className($constructorData);
@@ -519,11 +561,11 @@ abstract class Model
     /**
      * Is this entity modified?
      *
-     * @return int
+     * @return boolean
      */
-    protected function isModified()
+    protected function isModified(): bool
     {
-        return count($this->modifiedProperties) > 0;
+        return (count($this->modifiedProperties) > 0);
     }
 
     /**
@@ -531,7 +573,7 @@ abstract class Model
      *
      * @return string
      */
-    protected function getDependencies()
+    protected function getDependencies(): string
     {
         return implode('/', $this->dependentResources);
     }
@@ -539,7 +581,7 @@ abstract class Model
     /**
      * Where to find the single resource data from the response payload.
      *
-     * You should overwrite this method in your model class to suite your needs.
+     * You should overwrite this method in your model class to suit your needs.
      *
      * @param $payload
      * @return mixed
@@ -552,7 +594,7 @@ abstract class Model
     /**
      * Where to find the array of data from the response payload.
      *
-     * You should overwrite this method in your model class to suite your needs.
+     * You should overwrite this method in your model class to suit your needs.
      *
      * @param $payload
      * @return mixed
@@ -563,54 +605,22 @@ abstract class Model
     }
 
     /**
-     * Hydrate model instance
+     * Hydrate model instance with data.
      *
-     * @param array|object $data
-     * @throws ActiveResourceException
-     * @return boolean
+     * @param array<string, mixed> $data
+     * @return void
      */
-    protected function hydrate($data)
+    protected function hydrate(array $data): void
     {
-        if( empty($data) ){
-            return true;
-        }
+        foreach( $data as $property => $value ){
 
-        // Convert array based data into object
-        if( is_array($data) ) {
-            $data = (object)$data;
-        }
-
-        // Process the data payload object
-        if( is_object($data) ){
-            foreach( get_object_vars($data) as $property => $value ){
-
-                // is there some sort of filter method on this property?
-                if( method_exists($this, $property) ){
-                    $value = $this->{$property}($value);
-                }
-
-                $this->properties[$property] = $value;
+            if( method_exists($this, $property) ){
+                $value = $this->{$property}($value);
             }
 
-            return true;
+            $this->properties[$property] = $value;
         }
-
-        throw new ActiveResourceException('Failed to hydrate - invalid data format.');
     }
-
-    /**
-     * Manually set the resource identifier on the model instance.
-     *
-     * This property is used to inform the model whether the object was retrieved via the API vs a manually hydrated
-     * object instance.
-     *
-     * @param $value
-     */
-    public function setResourceIdentifier($value)
-    {
-        $this->resourceIdentifier = $value;
-    }
-
 
     /**
      * Find (GET) a specific resource by its ID
@@ -621,14 +631,12 @@ abstract class Model
      * @param integer|string $id
      * @param array $queryParams
      * @param array $headers
-     *
      * @throws ActiveResourceResponseException
-     *
-     * @return Model|boolean
+     * @return Model|null
      */
-    public static function find($id, array $queryParams = [], array $headers = [])
+    public static function find($id, array $queryParams = [], array $headers = []): ?Model
     {
-        $instance = self::getCalledClassInstance();
+        $instance = self::getModelInstance();
 
         $uri = $instance->getResourceUri() . "/{$id}";
 
@@ -637,16 +645,17 @@ abstract class Model
 
         // Send the request
         $response = $instance->getConnection()->send($request);
+        
         if( $response->isSuccessful() ) {
-            $instance->hydrate($instance->parseFind($response->getPayload()));
+            $instance->hydrate(
+                $instance->parseFind(
+                    $instance->deserialize($response->getBody()->getContents())
+                )
+            );
             return $instance;
         }
 
-        if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($response);
-        }
-
-        return false;
+        return null;
     }
 
     /**
@@ -657,30 +666,25 @@ abstract class Model
      *
      * @param array $queryParams
      * @param array $headers
-     *
      * @throws ActiveResourceResponseException
-     *
-     * @return array|boolean|mixed
+     * @return mixed
      */
     public static function all(array $queryParams = [], array $headers = [])
     {
-        $instance = self::getCalledClassInstance();
+        $instance = self::getModelInstance();
 
         // Build the request
         $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
 
         // Send the request
         $response = $instance->getConnection()->send($request);
+
         if( $response->isSuccessful() ) {
             $data = $instance->parseAll($response->getPayload());
             return $instance->buildCollection(get_called_class(), $data);
         }
 
-        if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($response);
-        }
-
-        return false;
+        return null;
     }
 
     /**
@@ -696,7 +700,7 @@ abstract class Model
      */
     public static function delete($id, array $queryParams = [], array $headers)
     {
-        $instance = self::getCalledClassInstance();
+        $instance = self::getModelInstance();
 
         $uri = $instance->getResourceUri() . "/{$id}";
 
@@ -705,12 +709,9 @@ abstract class Model
 
         // Send request
         $response = $instance->getConnection()->send($request);
+
         if( $response->isSuccessful() ) {
             return true;
-        }
-
-        if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($response);
         }
 
         return false;
@@ -732,32 +733,30 @@ abstract class Model
      * @param string|null $id
      * @param array $queryParams
      * @param array $headers
-     *
      * @throws ActiveResourceResponseException
-     *
-     * @return Model|bool
+     * @return Model|null
      */
-    public static function findThrough($resource, $id = null, array $queryParams = [], array $headers = [])
+    public static function findThrough($resource, $id = null, array $queryParams = [], array $headers = []): ?Model
     {
-        $instance = self::getCalledClassInstance();
-        $instance->through($resource);
-        $uri = $instance->getResourceUri() . "/{$id}";
+        // Create model instance and set a dependent resource.
+        $instance = self::getModelInstance()->through($resource);
 
-        // Build request object
-        $request = $instance->getConnection()->buildRequest('get', $uri, $queryParams, null, $headers);
+        // Send request
+        $response = $instance->getConnection()->send(
+            $instance->getConnection()->buildRequest('get', $instance->getResourceUri() . "/{$id}", $queryParams, null, $headers)
+        );
 
-        // Do request
-        $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
-            $instance->hydrate($instance->parseFind($response->getPayload()));
+            $instance->hydrate(
+                $instance->parseFind(
+                    $instance->deserialize($response->getBody()->getContents())
+                )
+            );
+
             return $instance;
         }
-
-        if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($response);
-        }
-
-        return false;
+        
+        return null;
     }
 
     /**
@@ -776,47 +775,45 @@ abstract class Model
      * @param Model|string $resource
      * @param array $queryParams
      * @param array $headers
-     *
      * @throws ActiveResourceResponseException
-     *
-     * @return Collection|bool
+     * @return mixed
      */
     public static function allThrough($resource, array $queryParams = [], array $headers = [])
     {
-        $instance = self::getCalledClassInstance();
-        $instance->through($resource);
+        $instance = self::getModelInstance()->through($resource);
 
-        // Build request object
-        $request = $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers);
+        $response = $instance->getConnection()->send(
+            $instance->getConnection()->buildRequest('get', $instance->getResourceUri(), $queryParams, null, $headers)
+        );
 
-        // Do request, get response
-        $response = $instance->getConnection()->send($request);
         if( $response->isSuccessful() ) {
-            $data = $instance->parseAll($response->getPayload());
-            return $instance->buildCollection(get_called_class(), $data);
+            return $instance->buildCollection(
+                get_called_class(),
+                $instance->parseAll(
+                    $instance->deserialize(
+                        $response->getBody()->getContents()
+                    )
+                )
+            );
         }
 
-        if( $response->isThrowable() ) {
-            throw new ActiveResourceResponseException($response);
-        }
-
-        return false;
+        return null;
     }
 
 	/**
-	 * Build a collection of models
+	 * Build a collection of models.
 	 *
-	 * @param string $model
+	 * @param string $modelClass
 	 * @param array $data
-	 *
-	 * @return array|mixed
+	 * @return mixed
 	 */
-    protected function buildCollection($model, array $data)
+    protected function buildCollection(string $modelClass, array $data)
 	{
-		$instances = [];
+        $instances = [];
+        
 		foreach( $data as $object ){
 		    /** @var Model $modelInstance */
-		    $modelInstance = new $model;
+		    $modelInstance = new $modelClass;
 		    $modelInstance->hydrate($object);
 			$instances[] = $modelInstance;
 		}
@@ -829,42 +826,22 @@ abstract class Model
 	}
 
 	/**
-	 * Get the Request object from the last API call
+	 * Get the Request object from the last call.
 	 *
-	 * @return Request
+	 * @return RequestInterface
 	 */
-	public function getRequest()
+	public function getRequest(): RequestInterface
 	{
 		return $this->getConnection()->getLastRequest();
 	}
 
 	/**
-	 * Get the Response object from the last API call
+	 * Get the Response object from the last call.
 	 *
-	 * @return ResponseAbstract
+	 * @return ResponseInterface
 	 */
-	public function getResponse()
+	public function getResponse(): ResponseInterface
 	{
 		return $this->getConnection()->getLastResponse();
-	}
-
-	/**
-	 * Get the Request object from the last API call
-	 *
-	 * @return Request
-	 */
-	public static function request()
-	{
-		return self::connection()->getLastRequest();
-	}
-
-	/**
-	 * Get the Response object from the last API call
-	 *
-	 * @return ResponseAbstract
-	 */
-	public static function response()
-	{
-		return self::connection()->getLastResponse();
 	}
 }
