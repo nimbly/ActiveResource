@@ -495,15 +495,6 @@ abstract class Model
         return ConnectionManager::get($this->connectionName);
     }
 
-	/**
-	 * Get the API connection for the model
-	 *
-	 * @return Connection
-	 */
-	public static function connection(){
-		return self::getCalledClassInstance()->getConnection();
-	}
-
     /**
      * Return an instance of the called class
      *
@@ -846,25 +837,5 @@ abstract class Model
 	public function getResponse()
 	{
 		return $this->getConnection()->getLastResponse();
-	}
-
-	/**
-	 * Get the Request object from the last API call
-	 *
-	 * @return Request
-	 */
-	public static function request()
-	{
-		return self::connection()->getLastRequest();
-	}
-
-	/**
-	 * Get the Response object from the last API call
-	 *
-	 * @return ResponseAbstract
-	 */
-	public static function response()
-	{
-		return self::connection()->getLastResponse();
 	}
 }
