@@ -1,13 +1,6 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: brent
- * Date: 5/18/17
- * Time: 2:07 PM
- */
 
 namespace Tests;
-
 
 use ActiveResource\Connection;
 use ActiveResource\ConnectionManager;
@@ -22,7 +15,6 @@ use Tests\Models\Users;
 
 class ConnectionOptionsTest extends BaseTestCase
 {
-
 	public function test_option_default_uri()
 	{
 		$baseUri = 'http://api.nimbly.io/v1/';
