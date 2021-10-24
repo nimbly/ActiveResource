@@ -25,17 +25,17 @@
         }
     },
     "require": {
-        "php": "~5.4 || ~7.0",
+        "php": ">=7.3|^8.0",
         "guzzlehttp\/guzzle": "^6.2",
         "optimus\/onion": "^1.0"
     },
     "autoload-dev": {
         "psr-4": {
-            "Tests\\": "tests/",
-            "Tests\\Models\\": "tests/Models"
+            "Tests\\": "tests/"
         }
     },
     "require-dev": {
-        "phpunit\/phpunit": "^6.5"
+        "phpunit\/phpunit": "^9",
+        "vimeo/psalm": "^4.11"
     }
 }
