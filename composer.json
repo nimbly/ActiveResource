@@ -1,6 +1,7 @@
 {
 	"name": "nimbly/activeresource",
 	"description": "Use a RESTful API in an ActiveRecord pattern.",
+	"license": "MIT",
     "require": {
 		"php": "^8.2",
 		"psr/http-client": "^1.0",
