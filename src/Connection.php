@@ -1,390 +1,158 @@
 <?php
 
-namespace ActiveResource;
+namespace Nimbly\ActiveResource;
 
-
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\BadResponseException;
-use GuzzleHttp\Exception\ConnectException;
-use Optimus\Onion\Onion;
+use UnexpectedValueException;
 
 class Connection
 {
 	/**
-	 * @var Client
-	 */
-	protected $httpClient = null;
-
-	/**
-	 * @var  Onion
-	 */
-	protected $middlewareManager;
-
-	/**
-	 * @var array
-	 */
-	protected $log = [];
-
-	/**
-	 * The base URI to prepend to each request
+	 * HTTP method to use when creating.
 	 *
-	 * Type: string
-	 * Default: null
+	 * Default: "post"
 	 */
-	const OPTION_BASE_URI = 'baseUri';
+	public const OPTION_CREATE_METHOD = "create_method";
 
 	/**
-	 * An array of key => value pairs to include in the headers with each request.
+	 * HTTP method to use when updating.
 	 *
-	 * Type: array
-	 * Default: []
+	 * Default: "put"
 	 */
-	const OPTION_DEFAULT_HEADERS = 'defaultHeaders';
+	public const OPTION_UPDATE_METHOD = "update_method";
 
 	/**
-	 * The default Content-Type when sending requests with a body (POST, PUT, PATCH)
+	 * Send just the properties that have changed when updating.
 	 *
-	 * Type: string
-	 * Default: 'application/json'
-	 */
-	const OPTION_DEFAULT_CONTENT_TYPE = 'defaultContentType';
-
-	/**
-	 * An array of key => value pairs to include in the query params with each request.
-	 *
-	 * Type: array
-	 * Default: []
-	 */
-	const OPTION_DEFAULT_QUERY_PARAMS = 'defaultQueryParams';
-
-	/**
-	 * Response class name
-	 *
-	 * Type: string
-	 * Default: 'ActiveResource\\Response'
-	 */
-	const OPTION_RESPONSE_CLASS = 'responseClass';
-
-	/**
-	 * Name of custom Collection class to use to pass array of models to. Class must allow passing in array of data into
-	 * constructor. Set to NULL to return a simple Array of objects.
-	 *
-	 * Type: string
-	 * Default: 'ActiveResource\\Collection'
-	 */
-	const OPTION_COLLECTION_CLASS = 'collectionClass';
-
-	/**
-	 * HTTP method to use for updates
-	 *
-	 * Type: string
-	 * Default: 'put'
-	 */
-	const OPTION_UPDATE_METHOD = 'updateMethod';
-
-	/**
-	 * If the API allows you to send *just* the modified fields on update, you can set this to true to help
-	 * speed things up by making the request body smaller.
-	 *
-	 * Type: boolean
 	 * Default: false
 	 */
-	const OPTION_UPDATE_DIFF = 'updateDiff';
+	public const OPTION_UPDATE_DIFF = "update_diff";
 
 	/**
-	 * Array of class names to apply before each request is sent.
+	 * HTTP version to use when sending requests.
 	 *
-	 * Type: array
-	 * Default: []
+	 * Default: "1.1"
 	 */
-	const OPTION_MIDDLEWARE = 'middleware';
+	public const OPTION_HTTP_VERSION = "http_version";
 
 	/**
-	 * Keep a log of all calls made
+	 * Serializer to use on request body when sending requests.
 	 *
-	 * Type: boolean
-	 * Default: false
+	 * Default: "json_encode"
 	 */
-	const OPTION_LOG = 'log';
+	public const OPTION_SERIALIZER = "serializer";
 
 	/**
-	 * Common API content types
+	 * Deserializer to use when parsing response.
+	 *
+	 * Default: "json_decode"
 	 */
-	const CONTENT_TYPE_JSON = 'application/json';
-	const CONTENT_TYPE_XML = 'application/xml';
-	const CONTENT_TYPE_FORM = 'application/x-www-form-urlencoded';
+	public const OPTION_DESERIALIZER = "deserializer";
 
-
-	/** @var array  */
-	protected $options = [
-		self::OPTION_BASE_URI => null,
-		self::OPTION_DEFAULT_HEADERS => [],
-		self::OPTION_DEFAULT_CONTENT_TYPE => self::CONTENT_TYPE_JSON,
-		self::OPTION_DEFAULT_QUERY_PARAMS => [],
-		self::OPTION_RESPONSE_CLASS => 'ActiveResource\\Response',
-		self::OPTION_COLLECTION_CLASS => 'ActiveResource\\Collection',
-		self::OPTION_UPDATE_METHOD => 'put',
+	/**
+	 * Connection default options.
+	 *
+	 * @var array<string,mixed>
+	 */
+	protected array $default_options = [
+		self::OPTION_CREATE_METHOD => "post",
+		self::OPTION_UPDATE_METHOD => "put",
 		self::OPTION_UPDATE_DIFF => false,
-		self::OPTION_MIDDLEWARE => [],
-		self::OPTION_LOG => false,
+		self::OPTION_HTTP_VERSION => "1.1",
+		self::OPTION_SERIALIZER => "\json_encode",
+		self::OPTION_DESERIALIZER => "\json_decode",
 	];
 
-	/** @var Request */
-	protected $request;
-
-	/** @var ResponseAbstract */
-	protected $response;
-
 	/**
-	 * Connection constructor.
-	 * @param Client $httpClient
-	 * @param array $options
+	 * @param string $host
+	 * @param array<string,mixed> $headers Default headers to include with each request.
+	 * @param array<string,mixed> $query Default query parameters to include with each request.
+	 * @param array<string,mixed> $options Override default options.
 	 */
-	public function __construct(array $options = [], Client $httpClient = null)
+	public function __construct(
+		protected string $host,
+		protected array $headers = [],
+		protected array $query = [],
+		protected array $options = [])
 	{
-		if( $options ){
-			foreach( $options as $option => $value ){
-				$this->setOption($option, $value);
-			}
-		}
-
-		if( !empty($httpClient) ){
-			$this->setHttpClient($httpClient);
-		}
+		$this->options = \array_merge($this->default_options, $options);
 	}
 
 	/**
-	 * Set the HTTP client for this connection
+	 * Get the hostname for this connection.
 	 *
-	 * @param Client $httpClient
+	 * @return string
 	 */
-	public function setHttpClient(Client $httpClient)
+	public function getHost(): string
 	{
-		$this->httpClient = $httpClient;
+		return $this->host;
 	}
 
 	/**
-	 * Set an option
+	 * Get the default headers.
 	 *
-	 * @param $name
-	 * @param $value
-	 *
-	 * @return Connection
+	 * @return array<string,mixed>
 	 */
-	public function setOption($name, $value)
+	public function getHeaders(): array
 	{
-		if( array_key_exists($name, $this->options) ){
-			$this->options[$name] = $value;
+		return $this->headers;
+	}
+
+	/**
+	 * Get the default query params.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public function getQuery(): array
+	{
+		return $this->query;
+	}
+
+	/**
+	 * Get a connection option value.
+	 *
+	 * @param string $option The connection option name.
+	 * @return mixed The connection option value. Returns `null` if option not set.
+	 */
+	public function getOption(string $option): mixed
+	{
+		return $this->options[$option] ?? null;
+	}
+
+	/**
+	 * Serialize a request body.
+	 *
+	 * @param mixed $data
+	 * @return string
+	 */
+	public function serialize(mixed $data): string
+	{
+		if( !isset($this->options[self::OPTION_SERIALIZER]) ||
+			!\is_callable($this->options[self::OPTION_SERIALIZER]) ) {
+			throw new UnexpectedValueException("Serializer is not callable.");
 		}
 
-		return $this;
-	}
-
-	/**
-	 * Get an option
-	 *
-	 * @param $name
-	 * @return mixed|null
-	 */
-	public function getOption($name)
-	{
-		if( array_key_exists($name, $this->options) ){
-			return $this->options[$name];
-		}
-
-		return null;
-	}
-
-	/**
-	 * Set this connection to use the Basic authorization schema by providing the username and password.
-	 *
-	 * @param $username
-	 * @param $password
-	 * @return $this
-	 */
-	public function useBasicAuthorization($username, $password)
-	{
-		$this->options[self::OPTION_DEFAULT_HEADERS] = array_merge(
-			$this->options[self::OPTION_DEFAULT_HEADERS],
-			['Authorization' => 'Basic '.base64_encode("{$username}:{$password}")]
+		return \call_user_func(
+			$this->options[self::OPTION_SERIALIZER],
+			$data
 		);
-
-		return $this;
 	}
 
 	/**
-	 * Set this connection to use the Bearer authorization schema by providing the bearer token.
+	 * Deserialize a response body.
 	 *
-	 * @param $token
-	 * @return $this
+	 * @param string $data
+	 * @return mixed
 	 */
-	public function useBearerAuthorization($token)
+	public function deserialize(string $data): mixed
 	{
-		$this->options[self::OPTION_DEFAULT_HEADERS] = array_merge(
-			$this->options[self::OPTION_DEFAULT_HEADERS],
-			['Authorization' => "Bearer {$token}"]
+		if( !isset($this->options[self::OPTION_DESERIALIZER]) ||
+			!\is_callable($this->options[self::OPTION_DESERIALIZER]) ) {
+			throw new UnexpectedValueException("Deserializer is not callable.");
+		}
+
+		return \call_user_func(
+			$this->options[self::OPTION_DESERIALIZER],
+			$data
 		);
-
-		return $this;
-	}
-
-	/**
-	 * Build an ActiveResource Request object instance using the connection's options.
-	 *
-	 * This Request object will be passed through the middleware layers.
-	 *
-	 * @param string $method HTTP method (get, post, put, delete, etc.)
-	 * @param string $url
-	 * @param array $queryParams Associative array of key=>value pairs to add to URL query
-	 * @param string|null $body The body to send in the request
-	 * @param array $headers Associative array of key=>value pairs to add to headers
-	 * @return Request
-	 */
-	public function buildRequest($method, $url, array $queryParams = [], $body = null, array $headers = [])
-	{
-		$request = new Request;
-
-		// Set the request method
-		$request->setMethod(strtoupper($method));
-
-		// Set the URI
-		$request->setUrl($this->getOption(self::OPTION_BASE_URI) . $url);
-
-		// Set the query params
-		$request->setQueries(array_merge($this->getOption(self::OPTION_DEFAULT_QUERY_PARAMS), $queryParams));
-
-		// Set the request body
-		$request->setBody($body);
-
-		// Set the headers
-		$request->setHeaders(array_merge($this->getOption(self::OPTION_DEFAULT_HEADERS), $headers));
-
-		// Check for Content-Type header and set it
-		if( in_array($request->getMethod(), ['POST','PUT','PATCH']) &&
-			$request->getHeader('Content-Type') === null &&
-			($contentType = $this->getOption(self::OPTION_DEFAULT_CONTENT_TYPE)) ){
-			$request->setHeader('Content-Type', $contentType);
-		}
-
-		return $request;
-	}
-
-	/**
-	 * Make the HTTP call
-	 *
-	 * @param Request $request
-	 * @throws ConnectException
-	 * @return ResponseAbstract
-	 */
-	public function send(Request $request)
-	{
-		// Initialize middleware manager
-		$this->initializeMiddlewareManager();
-
-		// Lazy load the the HttpClient
-		if( empty($this->httpClient) ){
-			$this->setHttpClient(new Client);
-		}
-
-		// Get the response class name to instantiate (to pass into Middleware)
-		$responseClass = $this->getOption(self::OPTION_RESPONSE_CLASS);
-
-		// Capture start time (for logging requests)
-		$start = microtime(true);
-
-		// Save the request object so it may be retrieved
-		$this->request = $request;
-
-		// Run the request
-		/** @var ResponseAbstract $response */
-		$response = $this->middlewareManager->peel(
-			$request,
-			function(Request $request) use ($responseClass): ResponseAbstract {
-
-			try {
-
-				$response = $this->httpClient->send($request->newPsr7Request());
-			} catch( BadResponseException $badResponseException ){
-				$response = $badResponseException->getResponse();
-			}
-
-			return new $responseClass($response);
-		});
-
-		// Capture end time
-		$stop = microtime(true);
-
-		// Save the response object so it may be retrieved
-		$this->response = $response;
-
-		// Should we log this request?
-		if( $this->getOption(self::OPTION_LOG) ){
-			$this->addLog($request, $response, ($stop-$start));
-		}
-
-		return $response;
-	}
-
-	/**
-	 * @return array
-	 */
-	public function getLog(): array
-	{
-		return $this->log;
-	}
-
-	/**
-	 * @param Request $request
-	 * @param ResponseAbstract $response
-	 * @param float $timing
-	 * @return void
-	 */
-	private function addLog(Request $request, ResponseAbstract $response, $timing): void
-	{
-		$this->log[] = [
-			'request' => $request,
-			'response' => $response,
-			'time' => $timing,
-		];
-	}
-
-	/**
-	 * Initialize middleware manager by instantiating all middlware classes
-	 * and creating Onion instance.
-	 *
-	 * @return void
-	 */
-	private function initializeMiddlewareManager()
-	{
-		if( empty($this->middlewareManager) ){
-
-			$layers = [];
-			foreach( $this->getOption(self::OPTION_MIDDLEWARE) as $middleware ){
-				$layers[] = new $middleware;
-			}
-
-			// Create new Onion
-			$this->middlewareManager = new Onion($layers);
-		}
-	}
-
-	/**
-	 * Get the last Request object
-	 *
-	 * @return \ActiveResource\Request
-	 */
-	public function getLastRequest()
-	{
-		return $this->request;
-	}
-
-	/**
-	 * Get the last Response object
-	 *
-	 * @return ResponseAbstract
-	 */
-	public function getLastResponse()
-	{
-		return $this->response;
 	}
 }

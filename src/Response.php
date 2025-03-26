@@ -1,26 +1,41 @@
 <?php
 
-namespace ActiveResource;
+namespace Nimbly\ActiveResource;
 
-
-class Response extends ResponseAbstract
+class Response
 {
-    /**
-     * Decode the response body
-     *
-     * @param string $body
-     * @return mixed
-     */
-    public function decode($body)
-    {
-        return json_decode($body);
-    }
+	/**
+	 * @param mixed $payload
+	 * @param array $headers
+	 */
+	public function __construct(
+		protected mixed $payload,
+		protected array $headers,
+	)
+	{
+		$this->headers = \array_map(
+			fn(array $values): string => \implode(", ", $values),
+			$headers
+		);
+	}
 
-    /**
-     * @return bool
-     */
-    public function isSuccessful()
-    {
-        return $this->getStatusCode() < 400;
-    }
+	/**
+	 * Get the parsed payload of the response.
+	 *
+	 * @return mixed
+	 */
+	public function getPayload(): mixed
+	{
+		return $this->payload;
+	}
+
+	/**
+	 * Get the response headers.
+	 *
+	 * @return array<string,string>
+	 */
+	public function getHeaders(): array
+	{
+		return $this->headers;
+	}
 }
