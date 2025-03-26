@@ -1,121 +1,216 @@
 <?php
 
-namespace ActiveResource;
+namespace Nimbly\ActiveResource;
 
+use Iterator;
+use Countable;
+use ArrayAccess;
 
-class Collection implements \IteratorAggregate, \Countable, \ArrayAccess
+/**
+ * A generic collection class that can be used to do basic array
+ * operations like filter, map, reduce, sort, etc. in a chainable
+ * functional way. You can also iterate over the class in for and
+ * foreach loops and directly access elements in the array.
+ */
+class Collection implements Iterator, ArrayAccess, Countable
 {
-	/**
-	 * @var array<Model>
-	 */
-	protected $objects = [];
+	protected int $index = 0;
 
-	/**
-	 * @var int
-	 */
-	protected $index = 0;
-
-	/**
-	 * Collection constructor.
-	 * @param array<Model> $data
-	 */
-	public function __construct(array $data = [])
+	public function __construct(
+		protected array $items
+	)
 	{
-		$this->objects = $data;
 	}
 
-	public function getIterator()
+	/**
+	 * @inheritDoc
+	 */
+	public function current(): mixed
 	{
-		return new \ArrayIterator($this->objects);
+		return $this->items[$this->index];
 	}
 
-	public function first()
+	/**
+	 * @inheritDoc
+	 */
+	public function key(): mixed
 	{
-		if( $this->offsetExists(0) ){
-			return $this->offsetGet(0);
+		return $this->index;
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function next(): void
+	{
+		$this->index++;
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function rewind(): void
+	{
+		$this->index = 0;
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function valid(): bool
+	{
+		return $this->offsetExists($this->index);
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function offsetExists(mixed $offset): bool
+	{
+		return $offset < \count($this->items);
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function offsetSet(mixed $offset, mixed $value): void
+	{
+		$this->items[$offset] = $value;
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function offsetGet(mixed $offset): mixed
+	{
+		return $this->items[$offset];
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function offsetUnset(mixed $offset): void
+	{
+		unset($this->items[$offset]);
+	}
+
+	/**
+	 * @inheritDoc
+	 */
+	public function count(): int
+	{
+		return \count($this->items);
+	}
+
+	/**
+	 * Get the resources.
+	 *
+	 * @return array<Resource>
+	 */
+	public function toArray(): array
+	{
+		return $this->items;
+	}
+
+	/**
+	 * Filter out results from array.
+	 *
+	 * @param callable $callback
+	 * @param integer $mode
+	 * @return Collection<Resource>
+	 */
+	public function filter(callable $callback, int $mode = 0): Collection
+	{
+		return new Collection(
+			\array_filter($this->items, $callback, $mode)
+		);
+	}
+
+	/**
+	 * Map items in collection to a new value.
+	 *
+	 * @param callable $callback
+	 * @return Collection
+	 */
+	public function map(callable $callback): Collection
+	{
+		return new Collection(
+			\array_map($callback, $this->items)
+		);
+	}
+
+	/**
+	 * Reduce the items to a single value.
+	 *
+	 * @param callable $callback
+	 * @param mixed $initial
+	 * @return mixed
+	 */
+	public function reduce(callable $callback, mixed $initial = null): mixed
+	{
+		return \array_reduce($this->items, $callback, $initial);
+	}
+
+	/**
+	 * Take a slice or subset of the array.
+	 *
+	 * @param integer $offset
+	 * @param integer|null $length
+	 * @param boolean $preserve_keys
+	 * @return Collection<Resource>
+	 */
+	public function slice(int $offset, ?int $length = null, bool $preserve_keys = false): Collection
+	{
+		return new Collection(
+			\array_slice($this->items, $offset, $length, $preserve_keys)
+		);
+	}
+
+	/**
+	 * Find a specific item in the collection.
+	 *
+	 * @param string $property
+	 * @param mixed $value
+	 * @return mixed
+	 */
+	public function find(string $property, mixed $value): mixed
+	{
+		foreach( $this->items as $item ){
+			if( $item->{$property} === $value ){
+				return $item;
+			}
 		}
 
 		return null;
 	}
 
-	public function toArray()
+	/**
+	 * Index the collection based on a particular property.
+	 *
+	 * @param string $property
+	 * @return Collection
+	 */
+	public function index(string $property): Collection
 	{
-		$objects = [];
-		foreach( $this->objects as $object ){
-			if( $object instanceof Model ){
-				$objects[] = $object->toArray();
-			}
+		$results = [];
+
+		foreach( $this->items as $item ){
+			$results[$item->{$property}] = $item;
 		}
 
-		return $objects;
+		return new Collection($results);
 	}
 
-	public function toJson(): ?string
+	/**
+	 * Sort items in array with a custom function.
+	 *
+	 * @param callable $callback
+	 * @return Collection
+	 */
+	public function sort(callable $callback): Collection
 	{
-		return \json_encode($this->toArray());
-	}
-
-	public function current()
-	{
-		return $this->objects[$this->index];
-	}
-
-	public function seek($position)
-	{
-		if( !($this->offsetExists($position)) ){
-			throw new \OutOfBoundsException('Offset does not exist');
-		}
-
-		$this->index = $position;
-	}
-
-	public function next()
-	{
-		$this->index++;
-	}
-
-	public function rewind()
-	{
-		$this->index = 0;
-	}
-
-	public function count()
-	{
-		return count($this->objects);
-	}
-
-	public function valid()
-	{
-		return (($this->index+1) > $this->count());
-	}
-
-	public function key()
-	{
-		return $this->index;
-	}
-
-	public function offsetGet($offset)
-	{
-		return $this->objects[$offset];
-	}
-
-	public function offsetExists($offset)
-	{
-		return (array_key_exists($offset, $this->objects));
-	}
-
-	public function offsetSet($offset, $value)
-	{
-		if( $offset == null ){
-			$this->objects[] = $value;
-		}
-		else {
-			$this->objects[$offset] = $value;
-		}
-	}
-
-	public function offsetUnset($offset)
-	{
-		unset($this->objects[$offset]);
+		$items = $this->toArray();
+		\uasort($items, $callback);
+		return new Collection($items);
 	}
 }

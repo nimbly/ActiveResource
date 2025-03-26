@@ -1,787 +1,431 @@
 # ActiveResource
-Framework agnostic PHP ActiveResource implementation.
 
-Use a RESTful resource based API like a database in an ActiveRecord pattern.
+[![Latest Stable Version](https://img.shields.io/packagist/v/nimbly/activeresource.svg?style=flat-square)](https://packagist.org/packages/nimbly/activeresource)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/nimbly/activeresource/coverage.yml?style=flat-square)](https://github.com/nimbly/Capsule/actions/workflows/coverage.yml)
+[![Codecov branch](https://img.shields.io/codecov/c/github/nimbly/activeresource/master?style=flat-square)](https://app.codecov.io/github/nimbly/Capsule)
+[![License](https://img.shields.io/github/license/nimbly/activeresource.svg?style=flat-square)](https://packagist.org/packages/nimbly/activeresource)
 
-## Author's note
-This project was started because I could not seem to find a good, maintained, and easy to use PHP based
-ActiveResource package. Even though it's still in its infancy, I have personally used it on two
-separate projects interacting with two completely different APIs: one built and maintained by me and
-the other a 3rd party.
+Use a RESTful API in an ActiveRecord pattern.
 
-I hope you will find it as useful as I have.
+## Requirements
 
-If you have any suggestions or potential feature requests, feel free to ping me [brent@brentscheffler.com](brent@brentscheffler.com)
+* PHP 8.2+
+* ext-json
+* RMM Level 2 compliant API (see [Richardson Maturity Model](https://martinfowler.com/articles/richardsonMaturityModel.html))
 
-## Installation
+## Install
 
-    composer require nimbly/activeresource
-    
+```bash
+composer require nimbly/activeresource
+```
+
 ## Quick start
 
-This quick start guide assumes the API:
-
-1. Accepts and responds JSON (application/json)
-2. Uses HTTP response codes to indicate response status (200 OK, 404 Not Found, 400 Bad Request, etc)
-3. Is resource based - you interact with nouns (resources), not verbs
-
-If the API you are working with doesn't have these assumptions, that's okay, just be sure to read the documentation
-for full configuration options, custom `Response` and `Error` classes, and Middleware.
-
-#### Create the connection
-    
-```php
-
-    $options = [
-        Connection::OPTION_BASE_URI => 'https://someapi.com/v1/',
-        Connection::OPTION_DEFAULT_HEADERS => [
-            'Authorization' => 'Bearer MYAPITOKEN',
-        ]
-    ];
-    
-    $connection = new Connection($options);
-```
-    
-#### Add connection to ConnectionManager
+### Define your API connection
 
 ```php
-    
-    ConnectionManager::add('default', $connection);
+$connection = new Connection(
+	host: "https://api.example.com",
+	headers: [
+		"Content-Type" => "application/json",
+		"Authorization" => "Bearer {$token}"
+	]
+);
 ```
-    
-#### Create your models
+
+### Add the Connection
 
 ```php
-
-    use ActiveResource\Model;
-    
-    /**
-    * Because the class name is "Users", ActiveResource assumes the API endpoint for this resource is "users".
-    */
-    class Users extends Model
-    {
-        /**
-        * The single user object can be found at $.data.user
-        *
-        * Sample response payload:
-        *
-        *    {
-        *        "data": {
-        *            "user": {
-        *                "id": "1",
-        *                "name": "Foo Bar",
-        *                "email": "foo@bar.com"
-        *            }
-        *        }
-        *    }
-        *         
-        *
-        */
-        protected function parseFind($payload)
-        {
-            return $payload->data->user;
-        }
-        
-        protected function parseAll($payload)
-        {
-            return $payload->data->users;
-        }
-
-    }
-    
-    
-    /**
-    * Because the class name is "Posts", ActiveResource assumes the API endpoint for this resource is "posts".
-    */
-    class Posts extends Model
-    {
-        // Manually set the endpoint for this resource. Now ActiveResource will hit "blogs" when making calls
-        // from this model.
-        protected $resourceName = 'blogs';
-    
-    
-        /**
-        * A blog post has an author object embedded in the response that
-        * maps to a User object.
-        */
-        protected function author($data)
-        {
-            return $this->includesOne(Users::class, $data);
-        }
-    
-        protected function parseFind($payload)
-        {
-            return $payload->data->post;
-        }
-        
-        protected function parseAll($payload)
-        {
-            return $payload->data->posts;
-        }
-         
-    }
-    
-    class Comments extends Model
-    {
-    
-        /**
-        * A comment has an author object embedded in the response that
-        * maps to a User object.
-        */
-        protected function author($data)
-        {
-            return $this->includesOne(Users::class, $data);
-        }
-        
-        
-        protected function parseFind($payload)
-        {
-            return $payload->data->comment;
-        }
-        
-        protected function parseAll($payload)
-        {
-            return $payload->data->comments;
-        }
-        
-    }
+ConnectionManager::init(["default" => $connection]);
 ```
 
-#### Use your models
+### Define your first Resource
 
 ```php
-
-    $user = new User;
-    $user->name = 'Brent Scheffler';
-    $user->email = 'brent@brentscheffler.com';
-    $user->save();
-    
-    $post = new Posts;
-    $post->title = 'Blog post';
-    $post->body = 'World\'s shortest blog post';
-    $post->author_id = $user->id;
-    $post->save();
-    
-    // Update the author (user)
-    $post->author->email = 'brent@nimbly.io';
-    
-    // Oops, save failed... Wonder what happened.
-    if( $post->author->save() == false )
-    {
-        // Looks like that email address is already being used
-        $code = $post->getResponse()->getStatusCode(); // 409
-        $error = $post->getResponse()->getStatusPhrase(); // Conflict    
-    }
-    
-    // Get user ID=1
-    $user = User::find(1);
-    
-    // Update the user
-    $user->status = 'inactive';
-    $user->save();
-
-    // Get all the users
-    $users = Users::all();
-    
-    // Pass in some query params to find only active users
-    $users = Users::all(['status' => 'active']);
-
-    // Delete user ID=1
-    $user->destroy();
-    
-    // Get the response code
-    $statusCode = $user->getResponse()->getStatusCode(); // 204 No Content
-
-    // Pass in a specific header for this call
-    $post = Posts::all([], ['X-Header-Foo' => 'Bar']);
-    
-    // Get blog post ID=1
-    $post = Posts::find(1);
-    
-    // Get all comments through Posts resource. The effective query would be GET#/blogs/1/comments
-    $comments = Comments::allThrough($post);
-    
-    // Or...
-    $comments = Comments::allThrough("blogs/1");
+class Book extends Resource
+{}
 ```
 
-#### That's it
-That's all there really is to using ActiveResource. Hopefully your API is mostly [RMM Level 2](https://martinfowler.com/articles/richardsonMaturityModel.html#level2)
- making configuration a breeze.
-
-## Configuration
-ActiveResource lets you connect to any number of RESTful APIs within your code.
-
-1. Create a `Connection` instance
-2. Use `ConnectionManager::add` to assign a name and add the `Connection` to its pool of connections.
-
-### Connection
-Create a new `Connection` instance representing a connection to an API. The constructor takes two parameters:
-
-##### Options
-The options array may contain:
-
-`defaultUri` *string* The default URI to prepend to each request. For example: `http://some.api.com/v2/`
-
-`defaultHeaders` *array* Key => value pairs of headers to include with every request.
-
-`defaultQueryParams` *array* Key => value pairs to include in the URL query part with every request.
-
-`defaultContentType` *string* The default Content-Type request header to use for requests that include a message body
-(PUT, POST, PATCH). Defaults to `application/json`. Some common content type strings are available as class constants on
-the `Connection` class.
-
-`responseClass` *string* Class name of the Response class to use for parsing responses including headers and body. Default
-is `ActiveResource\Response` class. See Response section for more info.
-
-`collectionClass` *string* Class name of a Collection class to use for handling arrays of models returned in a response.
-The Collection class must accept an array of data in its constructor. Default is `ActiveResource\Collection` class.
-Set to `null` to return a simple PHP array of model instances.
-
-This option is useful if you're working with a framework, library, or custom code that has a robust Collection utility like
-Laravel's `Illuminate\Support\Collection`.
-
-`updateMethod` *string* HTTP method to use for updates. Defaults to `put`.
-
-`updateDiff` *boolean* Whether ActiveResource can send just the modified fields of the resource on an update.
-
-`middleware` *array* An array of middleware classes to execute. See Middleware section for more info.
-
-`log` *boolean* Tell ActiveResource to log all requests and responses. Defaults to `false`. Do not use this option
-in production environments. You can access the log via the Connection getLog() method via the ConnectionManager.
-
-
-All of the above string options are available as class constants on the `Connection` class.
-
-##### HttpClient
-An optional instance of `GuzzleHttp\Client`. If you do not provide an instance, one will be created automatically
-with no options set.
-
-###### Example
+### Retrieve a record
 
 ```php
-
-    $options = [
-        Connection::OPTION_BASE_URI => 'http://api.someurl.com/v1/',
-        Connection::OPTION_UPDATE_METHOD => 'patch',
-        Connection::OPTION_UPDATE_DIFF => true,
-        Connection::OPTION_RESPONSE_CLASS => \My\Custom\Response::class,
-        Connection::OPTION_MIDDLEWARE => [
-            \My\Custom\Middleware\Authorize::class,
-            \My\Custom\Middleware\Headers::class,
-        ]
-    ];
-    
-    $connection = new \ActiveResource\Connection($options);
+$book = Book::find("123");
 ```
 
-### ConnectionManager
+ActiveResource will attempt to retrieve (`GET`) the `book` resource from the API with the following: `https://api.example.com/book/123`.
 
-Use `ConnectionManager::add` to add one or more Connection instances. This allows you to use ActiveResource with any
-number of APIs within your code. If you interact mostly with a single API, you can set the name to `default` without
-needing to specify the connection name on each of your models.
+If found, a fully hydrated `Book` class instance is returned using the response from the API.
 
-If you *do* need to interact with multiple APIs, be sure to give them distinct connection names. You'll likely want to
-create an abstract BaseModel with the connectionName property set and extend your actual models from the BaseModel.
-
-###### Example
-    
-```php
-
-    ConnectionManager::add('yourConnectionName', $connection);
-```
-
-
-## Response
-Although ActiveResource comes with a basic Response class (that simply JSON decodes the response body), each and every
-API responds with its own unique payload and encoding and it is recommended you provide your own custom response class that
-extends `\ActiveResource\ResponseAbstract`. See Connection option `responseClass`.
-
-### Required method implementation
-`decode` Accepts the raw payload contents from the response. Should return an array or \StdClass
-object representing the data. See Expected Data Format for more details.
-
-`isSuccessful` Should return a boolean indicating whether the request was successful or not. Some APIs
-do not adhere to strict REST patterns and may return an HTTP Status Code of 200 for all requests. In this
-case there is usually a property in the payload indicating whether the request was successful or not.
- 
-The Response object is also a great way to include any other methods to access non-payload
-related data or headers. It all depends on what data is in the response body for the API you
-are working with.
-
-###### Example
+### Get all records
 
 ```php
+$books = Book::all();
 
-    class Response extends \ActiveResource\ResponseAbstract
-    {
-        public function decode($payload)
-        {
-            return json_decode($payload);
-        }
-        
-        public function isSuccessful()
-        {
-            return $this->getStatusCode() < 400;
-        }
-        
-        public function getMeta()
-        {
-            return $this->getPayload()->meta;
-        }
-        
-        public function getEnvelope()
-        {
-            return $this->getPayload()->envelope;
-        }
-    }
-```
-    
-
-## Expected data format
-In order for ActiveResource to properly hydrate your Model instances, the decoded response payload must be formatted in
- the following pattern:
- 
-```json
- 
-     {
-         "property1": "value",
-         "property2": "value",
-         "property3": "value",
-         "related_single_resource": {
-             "property1": "value",
-             "property2": "value"
-         },
-         "related_multiple_resources": [
-             {
-                 "property1": "value",
-                 "property2": "value"
-             }
-         ]
-     }
+foreach( $books as $book ){
+	echo $book->title . "\n";
+}
 ```
 
-###### Example
+### Create a new record
+
+```php
+$book = new Book([
+	"title" => "Do Androids Dream of Electric Sheep?",
+	"author" => "Philip K Dick",
+]);
+```
+
+### Save a record
+
+```php
+$book->publisher = "Penguin";
+$book->published_at = "1983-11-12";
+$book->save();
+```
+
+### Delete a record
+
+```php
+$book->delete();
+```
+
+## Connection
+
+The `Connection` instance represents a single specific API integration. You must pass the hostname and base URI (if any). In addition to the host name, you can also specify default headers and query parameters to be included with each request, and other options that alter how the underlying API calls should be made.
+
+```php
+$connection = new Connection(
+	host: "https://api.example.com/v1/",
+	headers: [
+		"Content-Type" => "application/json",
+		"Authorization" => "Bearer {$token}"
+	],
+	options: [
+		Connection::UPDATE_METHOD => "patch",
+		Connection::UPDATE_DIFF => true,
+	]
+);
+```
+
+### Options
+
+`Connection::OPTION_CREATE_METHOD` (string) The HTTP method to use when creating new resources. Defaults to `POST`.
+`Connection::OPTION_UPDATE_METHOD` (string) The HTTP method to use when updating resources. Defaults to `PUT`.
+`Connection::OPTION_UPDATE_DIFF` (boolean) Set to true if the API allows only sending the properties that have changed when updating. Defaults to `false`.
+`Connection::OPTION_HTTP_VERSION` (string) The HTTP version to use when making API calls. Defaults to `1.1`.
+`Connection::OPTION_SERIALIZER` => (callable) The callable to use when serializing request body data. Defaults to `json_encode`.
+`Connection::OPTION_DESERIALIZER` => (callable) The callable to use when deserializing response body data. Defaults to `json_decode`.
+
+## Connection Manager
+
+The `ConnectionManager` manages your various connections and issues the underlying HTTP calls, serialization, deserialization, and event dispatching when saving and deleting resources.
+
+ActiveResource uses PSR-7 and PSR-17 instances to issue HTTP calls and handle the responses. You can bring your own implementations (eg, Guzzle). If none are provided, `nimbly/Shuttle` and `nimbly/Capsule` will be used.
+
+In addition to PSR-7 and PSR-17, a PSR-18 instance can be provided to dispatch events during the save and deletion lifecycle.
+
+```php
+ConnectionManager::init(
+	connections: [
+		"default" => $connection1,
+		"other" => $connection2,
+	],
+	httpClient: $httpClient,
+	requestFactory: $factory,
+	streamFactory: $factory,
+	eventDispatcher: $dispatcher,
+);
+```
+
+## Resources
+
+### Retrieving a single resource
+
+```php
+$book = Book::find($id);
+```
+
+### Retrieving multiple resources
+
+```php
+$books = Book::all();
+```
+
+A call to `all` will return a `ResourceCollection` instance that contains an array of the resources but also any metadata that was returned in the response as well as the response headers. The `ResourceCollection` implements `ArrayAccess`, `Iterator`, and `Countable` and can be used in `for` or `foreach` loops and calls to `count()`.
+
+```php
+$books = Book::all();
+
+echo "There are " . count($books) . " in this response.";
+
+foreach( $books as $book ){
+	// ...
+}
+```
+
+Unless the API directly returns an array of the resources, ActiveResource will need to know where to find the actual resources in the response data, you will need to add a `#[CollectionProperty]` attribute on the class.
+
+```php
+#[CollectionProperty("results")]
+class Book extends Resource
+{}
+```
+
+To retrieve response metadata, simply call the `getMeta` on the `ResourceCollection` instance.
+
+```php
+$books = Book::all();
+
+$books->getMeta("current_page");
+$books->getMeta("total_pages");
+```
+
+### Creating
+
+To create a new instance, simply instantiate the class, assign values (either in the constructor or directly), and call the `save()` method.
+
+```php
+$book = new Book([
+	"title" => "Do Androids Dream of Electric Sheep?",
+	"author" => "Philip K Dick"
+]);
+
+$book->save();
+```
+
+### Updating
+
+To update a resource, simply retrieve the resource from the API, make your changes, and call the `save()` method.
+
+```php
+$book = Book::find("123");
+$book->published_at = "2000-03-24";
+$book->save();
+```
+
+### Loading a resource from cache
+
+You can take a cached or shallow copy version of your resource and load it directly by calling the `make` method. If the cached version has an identifier set, subsequent calls to `save()` will update it. If no identifier exists, ActiveResource will assume it needs to be created when calling `save()`.
+
+```php
+$book = Book::make($cache);
+$book->published_at = "2000-03-24";
+$book->save();
+```
+
+### Fillable
+
+In order to bulk load values into a resource, you must define which fields *can* be bulk filled. Use the `$fillableProperties` class property to declare property names that can be bulk filled.
+
+```php
+class Book extends Resource
+{
+	protected array $fillableProperties = ["isbn", "title", "author"];
+}
+```
+
+Load values directly in constructor...
+
+```php
+$book = new Book([
+	"isbn" => "123123313",
+	"title" => "Do Androids Dream of Electric Sheep?",
+	"author" => "Philip K Dick"
+]);
+
+$book->save();
+```
+
+Update values with `fill`...
+
+```php
+$book->fill($request->getParsedBody());
+$book->save();
+```
+
+You can always directly set property values, regardless of whether they are listed in the `fillableProperties` array or not.
+
+```php
+class Book extends Resource
+{
+	protected array $fillableProperties = ["isbn", "title", "author"];
+}
+```
+
+```php
+$book = new Book;
+$book->published_at = "2000-03-24";
+```
+
+### Custom setters and getters
+
+You can create custom setters and getters that will be invoked when accessing or assigning resource properties. Simply name them as `get{Name}Property` and `set{Name}Property` where `{Name}` is the name of the property. Both methods will be passed the raw unmodified value and you must return the modified value.
+
+```php
+protected function getPublishedAtProperty(string $date): DateTime
+{
+	return new DateTime($date);
+}
+```
+
+```php
+protected function setPasswordProperty(#[SensitiveParameter] string $password): string
+{
+	return \password_hash($password, PASSWORD_BCRYPT);
+}
+```
+
+**NOTE:** These methods cannot be `private` (i.e. they must be `protected` or `public`.)
+
+### Computed values
+
+You can use a custom getter to provide computed values that have no base or raw value themselves by not providing any function parameters.
+
+```php
+class Book extends Resource
+{
+	protected function getAgeProperty(): int
+	{
+		return (new DateTime)->diff(new DateTime($this->created_at))->y;
+	}
+}
+```
+
+```php
+$book = Book::find("123");
+echo $book->age;
+```
+
+### Excluded properties
+
+Sometimes you need class properties that should be excluded from being sent with API requests when saving or updating. The `Resource` class provides an `$excludedProperties` property to accomplish this. Excluded properties do not prevent the property from being consumed when retrieving records from the API. Excluded properties can still use custom getters and setters.
+
+```php
+class Book extends Resource
+{
+	protected array $excludedProperties = ["age"];
+
+	protected function getAgeProperty(): int
+	{
+		return (new DateTime)->diff(new DateTime($this->published_at))->y;
+	}
+}
+```
+
+### Resource Attributes
+
+It's always better to adhere to convention over configuration, but ActiveResource does provide class attributes that can override convention.
+
+#### Connection name
+
+By default, ActiveResource will attempt to use the `default` connection from the connection manager. However, if you would like to use a different connection, you can add the `#[ConnectionName]` class attribute to your resource.
+
+```php
+#[ConnectionName("segment")]
+class User extends Resource
+{}
+```
+
+### Resource name
+
+By default, ActiveResource will use the lower case name of the class as the resource name. However, you can override this behavior by using the `#[ResourceName]` class attribute.
+
+```php
+#[ResourceName("library_books")]
+class Book extends Resource
+{}
+```
+
+### Resource identifier
+
+By default, ActiveResource assumes the identifier of the resource is contained within the `id` property of the response. You can override this behavior by using the `#[ResourceIdenfitier]` class attribute.
+
+```php
+#[ResourceIdentifier("isbn")]
+class Book extends Resource
+{}
+```
+
+### Collection property
+
+Many APIs return a slightly different response body when retrieving multiple records. For example, the response may contain some meta data about the page number, the total number of available records, and finally a property that actually contains the records themselves.
+
+For example, we make a call to get all the records of books...
+
+```php
+$books = Book::all();
+```
+
+And are returned the following payload (which is typical for paginated results)...
 
 ```json
+{
+	"count": 3,
+	"page": 1,
+	"total": 235,
+	"results": [
+		{
+			"id": 123,
+			"title": "Do Androids Dream of Electric Sheep?",
+			"author": "Philip K Dick"
+		},
 
-    {
-        "id": "1234",
-        "title": "Blog post",
-        "body": "This is a blog post",
-        "author": {
-            "id": "32135",
-            "name": "John Doe",
-            "email": "jdoe@example.com"
-        },
-        "comments": [
-            {
-                "id": "18319",
-                "body": "This is a comment",
-                "author": {
-                    "id": "49913",
-                    "name": "Jane Doe",
-                    "email": "jane.doe@example.com"
-                }
-            },
-                
-            {
-                "id": "18320",
-                "body": "This is another comment",
-                "author": {
-                    "id": "823194",
-                    "name": "Thomas Quigley",
-                    "email": "tquigley@example.com"
-                }
-            }
-        ]
-    }
+		{
+			"id": 345,
+			"title": "Breakfast of Champions",
+			"author": "Kurt Vonnegut"
+		},
+
+		{
+			"id": 256,
+			"title": "Less Than Zero",
+			"author": "Bret Easton Ellis"
+		}
+	]
+}
 ```
 
-If the API you are working with does not have its data formatted in this manor - you will need to transform it so that it is.
-This can (and should) be done in your `Response` class `decode` method.
-
-## Models
-Create your model classes and extend them from `\ActiveResource\Model`.
-
-##### Properties
-`connectionName` Name of connection to use. Defaults to `default`.
-
-`resourceName` Name of the API resource URI. Defaults to lowercase name of class.
-
-`resourceIdentifier` Name of the property to use as the ID. Defaults to `id`.
-
-`readOnlyProperties` Array of property names that are read only. When set to null or empty array, all properties are writable.
-
-`fillableProperties` When set to array of property names, only these properties are allowed to be mass assigned when calling the fill() method.
-If null, *all* properties can be mass assigned.
-
-`excludedProperties` Array of property names that are excluded when saving/updating model to API. If null or empty array, all properties can be sent when saving model.
-
-##### Static methods
-`find` Find a single instance of a resource given its ID. Assumes payload will return *single* object.
-
-`all` Get all instances of a resource. Assumes payload will return an *array* of objects.
-
-`delete` Destroy (delete) a resource given its ID. 
-
-`findThrough` Find a resource *through* another resource. For example, if you have to retrieve
-a comment through its post `/posts/1234/comments/5678`.
-
-`allThrough` Get all instances of a resource *through* another resource. For example, if you have
-to retrieve comments through its post `/posts/1234/comments`.
-
-`connection` Get the model's `Connection` instance.
-
-`request` Get the last request object.
-
-`response` Get the last response object.
-
-##### Instance methods
-`fill` Mass assign object properties with an array of key/value pairs.
-
-`save` Save or update the instance.
-
-`destroy` Destroy (delete) the instance.
-
-`getConnection` Get the model's `Connection` instance.
-
-`getRequest` Get the `Request` object for the last request.
-
-`getResponse` Get the `Response` object for the last request.
-
-`includesOne` Tells the Model class that the response includes a single instance of another
-model class. ActiveResource will then create an instance of the model and hydrate with the data.
-
-`includesMany` Tells the Model class that the response includes an array of instances of another
-model class. ActiveResource will then create a Collection of hydrated model instances.
-
-`parseFind` Tells the Model class where in the response payload to look for the data for a single resource. This method
-            is called when using the `find` and `findThrough` static methods and the `save` instance method. The `parseFind` method accepts
-            a single parameter containing the decoded payload and should return an object or an associative array
-            containing the instance data. If you do not specify this method on your model, ActiveResource will pass the
-            full payload to hydrate the model. Unless the API you are working with returns all relevant data in the root
-            of the response, you *must* implement this method. See Expected Data Format for more information.
-
-`parseAll` Tells the Model class where in the response payload to look for the data for an array of resources. This
-            method is called when using the `all` and `allThrough` static methods. This method accepts a single
-            parameter containing the decoded response payload and should return an object or an associative array
-            containing the instance data. If you do not specify this method on your model, ActiveResource will pass the
-            full payload to hydrate the model. Unless the API you are working with returns all relevant data in the root
-            of the response, you *must* implement this method. See Expected Data Format for more information.
-
-`encode` Called before sending a request to format and encode the model instance into a request body. Defaults to json_encode().
-You should override this method if you need a different format or encoding for the API you are working with.
-
-`reset` Resets the state of the model to its original condition - i.e. all modified properties are reverted.
-
-`original` Returns the original value of a property.
-
-
-You can also define `public` methods with the same name as an instance property that the model will send the data to.
-You can then modify the data or more commonly, create a new model instance representing the data.
- 
-For example, say you are interacting with a blog API that has blog posts, users, and comments. You create the three model
-classes representing the API resources.
-
-###### Users
+We need to let ActiveResource know to look in the `results` property for the actual returned resources.
 
 ```php
-
-    class Users extends \ActiveResource\Model
-    {
-    }
+#[CollectionProperty("results")]
+class Book extends Resource
+{}
 ```
-     
-###### Comments
+
+## Response headers
+
+Sometimes, it's important to capture response headers from the API. ActiveResource will attach the response headers to the retrieved `Resource` or `ResourceCollection`.
 
 ```php
+$book = Book::find($id);
 
-    class Comments extends \ActiveResource\Model
-    {
-        public function author($data)
-        {
-            return $this->includesOne(Users::class, $data);
-        }
-    }
+if( $book->getResponseHeader("X-Foo") === "bar" ) {
+	//...
+}
 ```
-
-###### Posts
 
 ```php
+$book = Book::find($id);
 
-    class Posts extends \ActiveResource\Model
-    {
-        public function author($data)
-        {
-            return $this->includesOne(Users::class, $data);
-        }
-        
-        public function comments($data)
-        {
-            return $this->includesMany(Comments::class, $data);
-        }
-        
-        /**
-        * You can find the blog post data in $.data.post in the payload
-        */
-        protected function parseFind($payload)
-        {
-            return $payload->data->post;
-        }
-        
-        /**
-        * You can find the collection of post data in $.data.posts in the payload
-        */
-        protected function parseAll($payload)
-        {
-            return $payload->data->posts;
-        }
-    }
+$headers = $book->getResponseHeaders();
 ```
 
-Now grab blog post ID 7.
- 
-```php
-
-    $posts = Posts::find(7);
-```
-    
-The response from the API looks like:
-
-```json
-
-    {
-        "data": {
-            "post": {
-                "id": 7,
-                "title": "Blog post",
-                "body": "I am a short blog post",
-                "author": {
-                    "id": 123,
-                    "name": "John Doe",
-                    "email": "jdoe@example.com"
-                },
-                "created_at": "2016-12-03 15:36:12",
-                "comments": [
-                    {
-                        "id": 8,
-                        "body": "Great article!",
-                        "author": {
-                            "id": 567,
-                            "name": "Thomas Quigley",
-                            "email": "tquigley@example.com"
-                        },
-                        "created_at": "2016-12-04 09:18:45"
-                    },
-                        
-                    {
-                        "id": 9,
-                        "body": "Love the way your write",
-                        "author": {
-                            "id": 4178,
-                            "name": "Jane Johnson",
-                            "email": "jjohnson@example.com"
-                        },
-                        "created_at": "2016-12-04 11:29:18"
-                    }
-                ]
-            }
-        }
-    }
-```
-    
-ActiveResource will automatically hydrate model instances for comments and authors (users) on the Posts instance. These
-instances can then be modified and updated or even deleted.
-
-## Middleware
-
-Middleware in ActiveResource is managed by the excellent [Onion](https://github.com/esbenp/onion) package - "a standalone middleware library without dependencies".
-
-Your middleware classes must implement Onion's LayerInterface class and implement the `peel` method.
-
-The input object is an `ActiveResource\Request` instance. The output is an instance of `ActiveResource\ResponseAbstract`.
-
-###### Example
-    
-```php
-
-    class Authorize implements LayerInterface
-    {
-        /**
-        *
-        *  @param \ActiveResource\Request $object
-        */
-        public function peel($object, \Closure $next)
-        {
-            // Add a query param to the URL (&foo=bar)
-            $object->setQuery('foo', 'bar');
-            
-            // Do some HMAC authorization logic here
-            // ...
-            // ...            
-            
-            // Now add the HMAC headers
-            $object->setHeader('X-Hmac-Timestamp', $timestamp);
-            $object->setHeader('Authorization', "HMAC {$hmac}");
-            
-            // Send the request off to the next layer
-            $response = $next($object);
-            
-            // Now let's slip in a spoofed header into the response object
-            $response->setHeader('X-Spoofed-Response-Header', 'Foo');
-            
-            // How about we completely change the response status code?
-            $response->setStatusCode(500);
-            
-            // Return the response
-            return $response;
-        }
-    }
-```
-    
-## Logging
-
-You can activate request and response logging of every ActiveResource call by enabling the `log` option on a `Connection`.
-To access the log data, call the `getLog` method on the connection. Due to memory footprint and security reasons, *do not*
-use logging in production environments.
-
-###### Example
+For calls to `all()`, the response headers will be attached to the `ResourceCollection` instance.
 
 ```php
-    $connection = new Connection([
-        Connection::OPTION_BASE_URI => 'https://someurl.com/v1/',
-        Connection::OPTION_LOG => true,
-    ]);
-    
-    ConnectionManager::add('yourConnectionName', $connection);
-    
-    $post = Post::find(12);
+$books = Book::all();
 
-    $connection = ConnectionManager::get('yourConnectionName');
-    $log = $connection->getLog();
-    
-        // Or...
-
-    
-    $post->getConnection()->getLog();
-
-       // Or...
-    
-    Post::connection()->getLog();
+if( $books->getResponseHeader("X-Foo") === "bar" ){
+	//...
+}
 ```
 
-## Quick Start Examples
+## Events
 
-### Find a single resource
+You can tap into the lifecycle events for saving and deleting resources by providing a PSR-X Event Dispatcher instance and subscribing to any of the following:
 
-```php
-
-    $user = User::find(123);
-```
-
-### Get all resources
-
-```php
-
-    $users = User::all();
-```
-
-### Creating a new resource
-
-```php
-
-    $user = new User;
-    $user->name = 'Test User';
-    $user->email = 'test@example.com';
-    $user->save();
-```
-    
-### Updating a resource
-
-```php
-
-    $user = User::find(123);
-    $user->status = 'INACTIVE';
-    $user->save();
-```
-    
-### Quickly assign properties
-
-```php
-
-    $user = User::find($id);
-    $user->fill([
-        'name' => 'Buckley',
-        'email' => 'buckley@example.com',
-    ]);
-    $user->save();
-```
-    
-### Destroy (delete) a resource
-
-```php
-
-    $user = User::find($id);
-    $user->destory();
-    
-    // Or...
-    
-    User::delete($id);
-```
-
-## FAQ
-##### How do I send an Authorization header with every request?
-If the Authorization scheme is either Basic or Bearer, the easiest way to add the header is in the
-`defaultHeaders` option array when creating the Connection object.
-
-###### Example
-        
-```php
-
-        $options = [
-            Connection::OPTION_BASE_URI => 'http://myapi.com/v2/',
-            Connection::OPTION_DEFAULT_HEADERS => [
-                'Authorization' => 'Bearer MYAPITOKEN',
-            ],
-        ];
-
-        $connection = new Connection($options);
-```
-        
-For Authorization schemas that are a bit more complex (eg HMAC), use a Middleware approach. See the Middleware section
-for more information.
-
-##### The API response payload I am working with has all its data returned in the same root path. Do I really need to have a parseFind and parseAll method on every model?
-No, you don't. Create an abstract BaseModel class with the `parseFind` and `parseAll` methods. Then extend
-all your models from that BaseModel.
-
-##### How do I handle JSON-API responses?
-In your `Response` object `decode` method you'll need to do a lot of work, but it can be done. ActiveResource
-is looking for the decoded payload data to be in a specific format. See Expected Data Format for more information. For
-requests that need to be in JSON-API format, you'll need to do a lot of work in the Model `encode` method.
-
-##### How do I access the response object to pull out headers, status code, or parse and error payload?
-You can access the `Response` object for the last API request via the Model's `getResponse` instance method.
-The `Response` object has methods for retrieving response headers, status, and body. Alternatively, you can also access
-the response object statically via the model's `response` static method.
-
-##### How can I throw an exception on certain HTTP response codes?
-The `Response` object has a protected array property called `throwable`. By default, HTTP Status 500 will throw an
-`ActiveResourceResponseException`. You can override the array in your `Response` class with any set of HTTP status
-codes you want. Or make it an empty array to *never* throw an exception.
-
-Connection issues including timeouts will *always* throw a `GuzzleHttp\Exception\ConnectException`.
-
-##### The API I am working with has an endpoint that simply does not conform to the ActiveResource pattern, how can I call the endpoint?
-You can send a custom request by getting the `Connection` object instance and using the `buildRequest` and `send`
-methods.
-
-```php
-
-    $connection = ConnectionManager::get('yourConnectionName');
-    $request = $connection->buildRequest('post', '/some/oddball/endpoint', ['param1' => 'value1'], ['foo' => 'bar', 'fox' => 'sox'], ['X-Custom-Header', 'Foo']);
-    $response = $connection->send($request);
-```
-    
-You'll get an instance of a `ResponseAbstract` object back.
+`ResourceSavingEvent` is triggered just before the API call to save/update the resource.
+`ResourceSavedEvent` is triggered after the resource has been succesfully saved.
+`ResourceDeletingEvent` is triggered just before the API cal to delete the resource.
+`ResourceDeletedEvent` is triggered after the resource has been successfully deleted.
